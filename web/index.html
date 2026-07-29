@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>新生入学 Copilot · Retrieval Lab</title>
+  <style>
+    :root { --ink:#13211b; --muted:#637068; --paper:#f7f5ee; --card:#fffdf8; --line:#d9ded7; --green:#1c6b4a; --amber:#b87918; --red:#ad3f34; }
+    * { box-sizing:border-box } body { margin:0; color:var(--ink); background:linear-gradient(135deg,#f3f7ef,#f8f2e8); font:15px/1.6 ui-sans-serif,system-ui,-apple-system,"PingFang SC",sans-serif }
+    header { padding:42px max(24px,calc((100vw - 1080px)/2)); border-bottom:1px solid var(--line); background:rgba(255,253,248,.75); backdrop-filter:blur(12px) }
+    h1 { margin:0; font-family:ui-serif,"Songti SC",serif; font-size:clamp(30px,5vw,54px); letter-spacing:-.04em }
+    header p { max-width:760px; color:var(--muted); margin:10px 0 0 }
+    main { max-width:1080px; margin:0 auto; padding:28px 24px 80px }
+    .search { display:grid; grid-template-columns:1fr auto; gap:10px; padding:14px; background:var(--card); border:1px solid var(--line); border-radius:18px; box-shadow:0 18px 55px rgba(55,64,48,.08) }
+    input { border:0; outline:0; background:transparent; font:inherit; font-size:17px; padding:10px }
+    button { border:0; border-radius:12px; padding:0 22px; color:white; background:var(--green); font-weight:700; cursor:pointer }
+    .meta { display:flex; flex-wrap:wrap; gap:9px; margin:18px 2px }
+    .pill { border:1px solid var(--line); border-radius:999px; padding:5px 10px; background:rgba(255,255,255,.65); color:var(--muted); font-size:12px }
+    .status { font-weight:700; color:var(--green) }
+    .result { margin:14px 0; padding:20px; border:1px solid var(--line); border-radius:16px; background:var(--card) }
+    .result h2 { margin:0 0 4px; font-size:17px }
+    .result p { white-space:pre-wrap; margin:13px 0; display:-webkit-box; -webkit-line-clamp:6; -webkit-box-orient:vertical; overflow:hidden }
+    .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; color:var(--muted); font-size:12px }
+    .official_policy { color:var(--green) } .peer_experience { color:var(--amber) } .unverified { color:var(--red) }
+    .scores { font-family:ui-monospace,SFMono-Regular,monospace; background:#f0f1eb; padding:8px 10px; border-radius:9px }
+    a { color:var(--green) } .empty { color:var(--muted); padding:50px 0; text-align:center }
+    @media(max-width:600px){ .search{grid-template-columns:1fr}.search button{height:46px} }
+  </style>
+</head>
+<body>
+  <header><h1>新生入学 Copilot</h1><p>先观察知识库怎样检索和判断证据，再决定大模型怎样回答。每条结果都暴露来源等级、适用性、未知信息和两个召回通道的分数。</p></header>
+  <main>
+    <div class="search"><input id="query" value="宿舍是几人间，能确定吗？" aria-label="查询"><button id="go">检索证据</button></div>
+    <div class="meta" id="meta"><span class="pill">正在读取知识库…</span></div>
+    <section id="results"><div class="empty">输入问题，查看检索链路。</div></section>
+  </main>
+  <script>
+    const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    async function stats(){const r=await fetch('/api/corpus/stats');const d=await r.json();document.querySelector('#meta').innerHTML=`<span class="pill">${d.documents} documents</span><span class="pill">${d.chunks} chunks</span><span class="pill">LLM: intentionally disconnected</span>`}
+    async function search(){const q=document.querySelector('#query').value.trim();if(!q)return;document.querySelector('#results').innerHTML='<div class="empty">检索中…</div>';const r=await fetch('/api/search',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({query:q,profile:{cohort:'2026',student_level:'undergraduate'}})});const d=await r.json();document.querySelector('#meta').innerHTML=`<span class="pill status">${esc(d.answerability)}</span><span class="pill">${esc(d.intent)}</span><span class="pill">${esc(d.retrieval_mode)}</span>`;document.querySelector('#results').innerHTML=d.results.map((x,i)=>`<article class="result"><div class="row"><strong>S${i+1}</strong><span class="${esc(x.authority_tier)}">${esc(x.authority_tier)}</span><span>${esc(x.assertion_policy)}</span><span>${esc(x.student_level)}</span>${x.published_at?`<span>发布 ${esc(x.published_at)}</span>`:`<span>发布日期待核实</span>`}${x.page_number?`<span>p.${x.page_number}</span>`:''}${x.uncertainty?.length?`<span>不确定：${esc(x.uncertainty.join(' / '))}</span>`:''}</div><h2>${esc(x.title)}</h2><p>${esc(x.text)}</p><div class="row scores">score ${x.score} · lexical ${x.score_explanation.lexical_rrf} · local-vector ${x.score_explanation.local_vector_rrf} · question-anchor ${x.score_explanation.anchor_similarity} · authority ×${x.score_explanation.authority_multiplier}</div><div class="row"><a href="${esc(x.source_url)}" target="_blank" rel="noreferrer">查看原始来源</a></div></article>`).join('')||'<div class="empty">没有足够证据，系统应拒答并请求补充材料。</div>'}
+    document.querySelector('#go').addEventListener('click',search);document.querySelector('#query').addEventListener('keydown',e=>{if(e.key==='Enter')search()});stats().then(search);
+  </script>
+</body>
+</html>

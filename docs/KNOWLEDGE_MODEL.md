@@ -1,0 +1,92 @@
+# Knowledge model and indexing decision
+
+## Decision
+
+Use an indexed document knowledge base with an explicit metadata store. Do not
+use a pure vector store as the system of record and do not model the corpus as
+a knowledge graph first.
+
+SQLite is the durable MVP store because the corpus is small, updates are
+batch-oriented, the index must be inspectable in an interview, and exact
+policy terms matter. A production deployment can move the same tables to
+PostgreSQL and put embeddings in pgvector without changing the logical model.
+
+## Entities
+
+```text
+Source site
+  └── Document
+        ├── provenance + checksum
+        ├── authority + assertion policy
+        ├── publication/effective/upload dates
+        ├── cohort/academic year/student level/major/campus
+        └── Chunk
+              ├── page + heading path + sequence
+              ├── chunk type
+              ├── uncertainty markers
+              └── retrieval indexes
+```
+
+`Document` is the provenance and lifecycle boundary. `Chunk` is only a
+retrieval unit; it never loses its parent source, page, authority, or
+applicability.
+
+## Chunking policy
+
+| Source | Unit | Why |
+| --- | --- | --- |
+| FAQ | complete question + complete answer | keeps the question's scope and the answer's caveats together |
+| policy | heading-aware paragraphs, 350-850 Chinese characters | preserves conditions, exceptions, article numbers, and page citations |
+| service manual | numbered steps grouped within a page | lets the answer composer assemble an ordered procedure |
+| form | resource entity, not factual passage | a blank form is something to open or submit, not a rule |
+| link | navigation resource | lets the product offer a next action without treating link metadata as policy |
+| image/scanned PDF | no assertable chunk before OCR | prevents filenames and captions from masquerading as source text |
+| record spreadsheet | privacy quarantine | avoids indexing names, student numbers, scores, or participation records |
+
+A global fixed-token splitter is specifically rejected. Chinese policy
+conditions frequently depend on the preceding article or the next exception;
+FAQ answers depend on their questions; procedure steps depend on their order.
+
+## Retrieval
+
+1. Apply hard applicability filters such as undergraduate vs graduate.
+2. Retrieve exact terminology with SQLite FTS5 over Chinese unigrams,
+   bigrams, trigrams, titles, headings, and tags.
+3. Retrieve an offline second candidate list with hashed character subword
+   vectors and a small domain synonym map.
+4. Fuse candidate ranks with reciprocal-rank fusion.
+5. Rerank with question/rule-anchor similarity, source authority, assertion
+   policy, and applicability.
+6. Produce an answerability state before calling a model.
+
+The offline vector is a testable baseline, not the production semantic model.
+Its interface should later be replaced by multilingual embeddings. Keep FTS5:
+exact terms such as document numbers, system names, form names, course types,
+and dates are often stronger than semantic similarity.
+
+## Answerability states
+
+- `supported`: current official evidence is present.
+- `supported_freshness_unverified`: official guidance is relevant but its
+  publication/effective date is not verified.
+- `supported_with_context`: official evidence plus non-conflicting peer
+  context is available.
+- `mixed_sources_review_required`: official and peer evidence coexist and a
+  top passage contains uncertainty.
+- `experience_only`: only student experience supports the response.
+- `insufficient_official_evidence`: the question asks for a rule or procedure
+  but no official evidence is available.
+- `unverified` / `insufficient`: the system must not generate a factual answer.
+
+## Why not a knowledge graph first
+
+A graph becomes valuable later for deadlines, dependencies, offices, forms,
+and personalized task plans. It does not solve paragraph retrieval, policy
+citations, or source freshness. The sensible evolution is:
+
+```text
+document index → structured action records → task/dependency graph
+```
+
+The MVP therefore leaves room for an `actions` table without forcing all prose
+into triples prematurely.

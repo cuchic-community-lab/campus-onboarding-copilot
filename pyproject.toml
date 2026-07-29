@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "campus-onboarding-copilot"
+version = "0.1.0"
+description = "Trust-aware retrieval foundation for an incoming-student copilot"
+requires-python = ">=3.9"
+dependencies = []
+
+[project.optional-dependencies]
+parsers = [
+  "pypdf>=5.0",
+  "python-docx>=1.1",
+  "openpyxl>=3.1",
+]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+campus-copilot = "campus_copilot.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
