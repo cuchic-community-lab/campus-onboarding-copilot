@@ -42,9 +42,9 @@ be asked to search the database itself.
 }
 ```
 
-## Provider interface
+## Implemented provider interface
 
-Implement one provider-neutral method:
+The application uses one provider-neutral method:
 
 ```python
 class AnswerComposer(Protocol):
@@ -53,7 +53,9 @@ class AnswerComposer(Protocol):
 ```
 
 Provider configuration belongs in environment variables or a secrets manager,
-not the repository. The response should use a structured schema:
+not the repository. `OpenAICompatibleComposer` uses only the standard library,
+and `ExtractiveComposer` is the no-key fallback. The response uses a structured
+schema:
 
 ```json
 {
@@ -78,12 +80,24 @@ Before returning an answer:
 6. `can_generate=false` permits only a refusal plus a request for the missing
    source.
 
+The current validator implements citation existence, inline citation presence,
+claim-to-evidence linkage, official-source requirements, peer-experience
+labeling, and refusal compliance. Full natural-language entailment checking is
+not yet implemented and must not be implied by the current validator.
+
+## Conversation boundary
+
+The session store retains at most four turns in memory. Explicit follow-ups may
+reuse the previous user question to form the retrieval query, while the answer
+still has to cite evidence retrieved on the current turn. Conversation text is
+never treated as factual evidence. Sessions disappear when the process restarts.
+
 ## Rollout
 
-1. Ship retrieval lab and collect failed queries.
-2. Create human relevance labels and tune retrieval.
-3. Add one model provider behind `AnswerComposer`.
-4. Add claim-to-citation validation and groundedness evaluation.
+1. Collect failed questions and create human relevance labels.
+2. Replace the local subword baseline and compare retrieval ablations.
+3. Add claim-level entailment and temporal-conflict evaluation.
+4. Persist isolated sessions only when account and retention rules exist.
 5. Add structured student actions only after the factual answer path is
    reliable.
 

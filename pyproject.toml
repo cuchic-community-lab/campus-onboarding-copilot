@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "campus-onboarding-copilot"
-version = "0.1.0"
-description = "Trust-aware retrieval foundation for an incoming-student copilot"
+version = "0.2.0"
+description = "Trust-aware grounded chat MVP for an incoming-student copilot"
 requires-python = ">=3.9"
 dependencies = []
 

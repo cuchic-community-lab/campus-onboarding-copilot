@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 
 SYSTEM_RULES = [
@@ -10,10 +10,20 @@ SYSTEM_RULES = [
     "Respect cohort, major, campus, and effective-date applicability.",
 ]
 
+GENERATABLE_MODES = {
+    "supported",
+    "supported_with_context",
+    "supported_freshness_unverified",
+    "mixed_sources_review_required",
+    "experience_only",
+}
 
-def build_context_packet(retrieval: Dict[str, object]) -> Dict[str, object]:
+
+def build_context_packet(
+    retrieval: Dict[str, object], conversation_history: Optional[List[Dict[str, object]]] = None
+) -> Dict[str, object]:
     status = str(retrieval.get("answerability", "insufficient"))
-    can_generate = status not in {"insufficient", "insufficient_official_evidence", "unverified"}
+    can_generate = status in GENERATABLE_MODES
     evidence: List[Dict[str, object]] = []
     for index, result in enumerate(retrieval.get("results", []), start=1):
         evidence.append({
@@ -34,9 +44,11 @@ def build_context_packet(retrieval: Dict[str, object]) -> Dict[str, object]:
         })
     return {
         "query": retrieval.get("query"),
+        "conversation_history": (conversation_history or [])[-8:],
         "can_generate": can_generate,
         "response_mode": status,
+        "insufficient_reason": retrieval.get("insufficient_reason"),
         "system_rules": SYSTEM_RULES,
         "evidence": evidence,
-        "model_contract_version": "campus-grounding-v1",
+        "model_contract_version": "campus-grounding-v2",
     }

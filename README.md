@@ -1,14 +1,14 @@
 # Campus Onboarding Copilot
 
-A runnable, trust-aware knowledge-base prototype for incoming students. The
+A runnable, trust-aware grounded-chat prototype for incoming students. The
 included CUCHIC adapter uses the public corpus at
 `https://hic.zihuanana.top/` as a demo instance.
 
-The prototype deliberately separates retrieval from generation. It first
-proves that the system can find the right evidence, preserve provenance,
-recognize unofficial experience, and abstain when evidence is incomplete.
-An LLM can then consume the resulting context packet without becoming the
-source of truth.
+The system separates retrieval from generation. It finds evidence, preserves
+provenance, recognizes unofficial experience, and abstains when evidence is
+incomplete. A configurable model may compose the final answer, but it never
+becomes the source of truth. Without a model credential, an auditable local
+composer keeps the complete product path runnable.
 
 ## Why this is an indexed knowledge base
 
@@ -50,6 +50,7 @@ make sync       # download manifest, Q&A, and public files
 make build      # normalize, chunk, and build SQLite indexes
 make audit      # inspect authority, parsing, privacy, and freshness gaps
 make evaluate   # run labeled retrieval and answerability checks
+make evaluate-chat # check citation, refusal, and peer-label contracts
 make demo       # run an uncertainty-sensitive example query
 make serve      # open http://127.0.0.1:8000
 ```
@@ -74,6 +75,8 @@ The zero-dependency server exposes:
 - `GET /api/corpus/stats`
 - `POST /api/search`
 - `POST /api/context`
+- `POST /api/chat`
+- `POST /api/session/reset`
 
 Example:
 
@@ -83,8 +86,12 @@ curl -s http://127.0.0.1:8000/api/search \
   -d '{"query":"宿舍是几人间","profile":{"cohort":"2026"}}'
 ```
 
-`/api/context` returns a model-ready evidence packet and response policy. It
-does not call a model. A future provider receives only this packet and must:
+`/api/chat` adds a bounded in-memory conversation (the most recent four turns),
+uses prior user intent to resolve explicit follow-ups, retrieves fresh evidence
+for every turn, and returns an answer with inspectable source objects.
+
+`/api/context` returns the same model-ready evidence packet and response policy.
+A provider receives only this packet and must:
 
 1. cite the supplied evidence IDs;
 2. label peer experience as peer experience;
@@ -92,9 +99,31 @@ does not call a model. A future provider receives only this packet and must:
 4. abstain when the packet says `can_generate=false`;
 5. preserve year, cohort, major, and campus applicability.
 
+## Optional economical model
+
+Any chat-completions endpoint that follows the OpenAI-compatible request shape
+can be used without adding a Python SDK. Configuration is entirely external:
+
+```bash
+export CAMPUS_LLM_BASE_URL="https://your-provider.example/v1"
+export CAMPUS_LLM_MODEL="your-economical-chat-model"
+export CAMPUS_LLM_API_KEY="..."
+make serve
+```
+
+The adapter requests structured claims and citations. Its output is checked
+against the current evidence IDs and source authority. Invalid output or a
+provider outage automatically falls back to the local composer. The current
+session store is intentionally process-local; persistence, account isolation,
+and cross-device history belong to a later production phase.
+
 ## Current corpus boundary
 
 The public site is a useful seed corpus, not a complete official source of
 truth. The MVP excludes QR communities and flags record-style spreadsheets as
 potentially sensitive. It also distinguishes `uploadTime` from publication and
 effective dates.
+
+`evaluate-chat` is a contract check, not a claim that answer quality is solved.
+Human-labeled completeness, usefulness, temporal conflicts, and held-out
+questions remain required before reporting a production accuracy metric.
