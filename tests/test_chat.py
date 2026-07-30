@@ -121,6 +121,30 @@ class ProgramOfferingWebRetriever(FakeWebRetriever):
         }
 
 
+class AutonomousWebRetriever(FakeWebRetriever):
+    def search(self, query, routes, top_k=4):
+        item = web_result(
+            "discovered-school-page",
+            "official_web",
+            "学校官网搜索结果直接回答了这个新问题。",
+        )
+        item["retrieval_origin"] = "autonomous_search"
+        item["heading_path"] = "自主官网搜索"
+        return {
+            "executed": True,
+            "provider": self.name,
+            "status": "success",
+            "routes": list(routes),
+            "results": [item],
+            "errors": [],
+            "discovery": {
+                "executed": True,
+                "provider": "fake_discovery",
+                "status": "success",
+            },
+        }
+
+
 class ChatTest(unittest.TestCase):
     def test_insufficient_evidence_bypasses_model_composer(self):
         retriever = FakeRetriever()
@@ -144,6 +168,40 @@ class ChatTest(unittest.TestCase):
         self.assertEqual(result["composer"], "extractive_fallback")
         self.assertEqual(result["answer_plan"]["fallback_route"], "public_web_discovery")
         self.assertEqual(result["citations"], [])
+        self.assertEqual(result["provenance"]["mode"], "search_unavailable")
+        self.assertIn("自主网页搜索尚未启用", result["provenance"]["notice"])
+        self.assertTrue(result["human_handoff"])
+
+    def test_autonomous_web_fallback_is_explicitly_disclosed(self):
+        retriever = FakeRetriever()
+
+        def insufficient_search(query, top_k, profile):
+            result = FakeRetriever().search(query, top_k, profile)
+            result["answerability"] = "insufficient_relevance"
+            return result
+
+        retriever.search = insufficient_search
+        result = GroundedChatService(
+            retriever,
+            composer=ExtractiveComposer(),
+            web_retriever=AutonomousWebRetriever(),
+        ).ask("一个知识库里没有的新问题")
+        self.assertEqual(result["provenance"]["mode"], "autonomous_web_fallback")
+        self.assertTrue(result["provenance"]["autonomous_search_executed"])
+        self.assertTrue(result["provenance"]["autonomous_search_used"])
+        self.assertIn("知识库里没有找到", result["provenance"]["notice"])
+        self.assertIn("本轮联网搜索", result["provenance"]["notice"])
+
+    def test_registered_snapshot_is_not_presented_as_autonomous_search(self):
+        result = GroundedChatService(
+            FakeRetriever(),
+            composer=ExtractiveComposer(),
+            web_retriever=ProgramOfferingWebRetriever(),
+        ).ask("视传只有中外合办有嘛")
+        self.assertEqual(result["provenance"]["mode"], "registered_web_fallback")
+        self.assertFalse(result["provenance"]["autonomous_search_executed"])
+        self.assertIn("不是本轮自主搜索", result["provenance"]["notice"])
+        self.assertIn("教务老师或招生办公室", result["human_handoff"])
 
     def test_follow_up_uses_prior_user_question_for_retrieval(self):
         retriever = FakeRetriever()

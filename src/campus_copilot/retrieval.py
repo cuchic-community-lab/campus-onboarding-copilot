@@ -378,8 +378,24 @@ class HybridRetriever:
             ]) for term in ("就业方向", "职业方向", "就业领域", "就业岗位", "从事", "毕业去向"))
             for item in results[:3]
         )
+        top_coverage = float(
+            (results[0].get("score_explanation") or {}).get("concept_coverage", 0.0)
+        ) if results else 0.0
+        top_anchor_coverage = float(
+            (results[0].get("score_explanation") or {}).get("anchor_coverage", 0.0)
+        ) if results else 0.0
+        top_entity_match = float(
+            (results[0].get("score_explanation") or {}).get("domain_entity_match", 0.0)
+        ) if results else 0.0
+        weak_local_match = (
+            bool(results)
+            and max(top_coverage, top_anchor_coverage) < 0.35
+            and top_entity_match < 1.0
+        )
         if question_type == "general_guidance" and not general_guidance_supported:
             status = "insufficient"
+        elif weak_local_match:
+            status = "insufficient_relevance"
         elif not results:
             status = "insufficient"
         elif intent == "policy_or_procedure" and not has_official:
@@ -398,5 +414,6 @@ class HybridRetriever:
             "retrieval_mode": "fts5_plus_local_subword_rrf",
             "answerability": status,
             "requires_uncertainty_label": uncertain,
+            "local_match_quality": "weak" if weak_local_match else ("usable" if results else "none"),
             "results": results,
         }
