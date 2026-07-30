@@ -10,6 +10,8 @@ SYSTEM_RULES = [
     "Preserve uncertainty words such as likely, inferred, expected, and unknown.",
     "If official evidence is required but missing, say what must be confirmed and abstain.",
     "Respect cohort, major, campus, and effective-date applicability.",
+    "Official web evidence may support school facts; public web evidence may support only public context and clearly labeled practical recommendations.",
+    "Never present a historical arrival notice or a public-web recommendation as the current official requirement.",
 ]
 
 GENERATABLE_MODES = {
@@ -18,6 +20,9 @@ GENERATABLE_MODES = {
     "supported_freshness_unverified",
     "mixed_sources_review_required",
     "experience_only",
+    "web_supported",
+    "public_web_supported",
+    "web_supported_mixed",
 }
 
 
@@ -44,7 +49,18 @@ def build_context_packet(
             "student_level": result["student_level"],
             "uncertainty": result["uncertainty"],
             "text": result["text"],
+            "retrieval_origin": result.get("retrieval_origin", "local_knowledge"),
+            "web_source_kind": result.get("web_source_kind"),
+            "fetched_at": result.get("fetched_at"),
         })
+    answer_plan = build_answer_plan(str(retrieval.get("query", "")), status)
+    web_search = retrieval.get("web_search") or {}
+    answer_plan.update({
+        "web_search_executed": bool(web_search.get("executed")),
+        "web_search_provider": web_search.get("provider"),
+        "web_search_status": web_search.get("status"),
+        "web_search_routes": web_search.get("routes", []),
+    })
     return {
         "query": retrieval.get("query"),
         "conversation_history": (conversation_history or [])[-8:],
@@ -52,7 +68,7 @@ def build_context_packet(
         "response_mode": status,
         "insufficient_reason": retrieval.get("insufficient_reason"),
         "system_rules": SYSTEM_RULES,
-        "answer_plan": build_answer_plan(str(retrieval.get("query", "")), status),
+        "answer_plan": answer_plan,
         "evidence": evidence,
-        "model_contract_version": "campus-grounding-v3-student-ambassador",
+        "model_contract_version": "campus-grounding-v4-governed-web",
     }

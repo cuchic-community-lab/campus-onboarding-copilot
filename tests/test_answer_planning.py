@@ -22,6 +22,17 @@ class AnswerPlanningTest(unittest.TestCase):
         plan = build_answer_plan("宿舍是几人间？", "experience_only")
         self.assertEqual(plan["fallback_route"], "local_knowledge")
 
+    def test_arrival_preparation_always_requests_official_and_public_context(self):
+        plan = build_answer_plan("开学报到要带些什么？", "experience_only")
+        self.assertEqual(plan["question_type"], "arrival_preparation")
+        self.assertEqual(plan["fallback_route"], "official_and_public_web_discovery")
+        self.assertTrue(plan["requires_web_enrichment"])
+
+    def test_organization_structure_uses_official_web(self):
+        plan = build_answer_plan("中传的组织架构是什么？", "experience_only")
+        self.assertEqual(plan["question_type"], "institution_structure")
+        self.assertEqual(plan["fallback_route"], "official_web_discovery")
+
 
 if __name__ == "__main__":
     unittest.main()

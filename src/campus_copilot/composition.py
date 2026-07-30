@@ -126,7 +126,12 @@ class ExtractiveComposer:
             item for item in context_packet.get("evidence", [])
             if item.get("assertion_policy") not in {"navigation_only", "do_not_assert", "do_not_assert_until_ocr"}
         ]
-        evidence_limit = 3 if eligible and eligible[0].get("chunk_type") == "structured_fact" else 1
+        question_type = str((context_packet.get("answer_plan") or {}).get("question_type", "campus_fact"))
+        evidence_limit = 3 if (
+            eligible and eligible[0].get("chunk_type") == "structured_fact"
+        ) or question_type == "arrival_preparation" else (
+            2 if question_type == "institution_structure" else 1
+        )
         evidence = eligible[:evidence_limit]
         if not evidence:
             return {
@@ -136,11 +141,120 @@ class ExtractiveComposer:
                 "unresolved": ["检索结果当前不可直接断言"],
             }
 
+        if question_type == "institution_structure":
+            item = next(
+                (value for value in evidence if "校内部门单位" in str(value.get("text", ""))),
+                evidence[0],
+            )
+            evidence_id = str(item["evidence_id"])
+            text = str(item.get("text", ""))
+            categories = [
+                name for name in ("党群机构", "行政机构", "教学单位", "直（附）属单位")
+                if name in text
+            ]
+            if categories:
+                category_text = "、".join(categories)
+                paragraphs = [
+                    f"从学校信息公开页面看，中传的校内单位主要分为四类：{category_text}。"
+                    "官网页面还列出了党政办公室、教务处等具体单位。"
+                    f" [{evidence_id}]"
+                ]
+                citations = [evidence_id]
+                claims = [{
+                    "text": f"中传校内单位分为{category_text}",
+                    "evidence_ids": [evidence_id],
+                    "certainty": "official",
+                }]
+                unresolved: List[str] = []
+                relation = next((
+                    value for value in evidence
+                    if value is not item and "一套班子三块牌子" in str(value.get("text", ""))
+                ), None)
+                if relation:
+                    relation_id = str(relation["evidence_id"])
+                    paragraphs.append(
+                        "海南这边，学校2022年的公开报道把国际传媒教育学院、海南国际学院和境外学生教育中心"
+                        "表述为“一套班子三块牌子”。也就是三块牌子共用一套管理班子；至于现在的具体分工，"
+                        f"还应以学院最新发布为准。 [{relation_id}]"
+                    )
+                    citations.append(relation_id)
+                    claims.append({
+                        "text": "国际传媒教育学院、海南国际学院和境外学生教育中心实行一套班子三块牌子",
+                        "evidence_ids": [relation_id],
+                        "certainty": "official",
+                    })
+                    unresolved.extend(str(value) for value in relation.get("uncertainty", []) if str(value))
+                return {
+                    "answer": "\n\n".join(paragraphs),
+                    "citations": citations,
+                    "claims": claims,
+                    "unresolved": unresolved,
+                }
+
+        if question_type == "arrival_preparation":
+            official = next((item for item in evidence if item.get("authority_tier") == "official_web"), None)
+            public = next((item for item in evidence if item.get("authority_tier") == "public_web"), None)
+            paragraphs: List[str] = []
+            citations: List[str] = []
+            claims: List[Dict[str, object]] = []
+            unresolved: List[str] = []
+            if official:
+                official_id = str(official["evidence_id"])
+                source_text = str(official.get("text", ""))
+                item_names = [
+                    name for name in ("录取通知书", "个人档案", "户口迁移证", "党、团组织关系", "照片")
+                    if name in source_text
+                ]
+                list_text = "、".join(item_names)
+                paragraphs.append(
+                    f"先把报到材料准备齐：{list_text}。这份依据来自2022级海南校区入学须知，"
+                    f"可以用来提前准备，但你这一届仍要以当年最新通知为准。 [{official_id}]"
+                )
+                citations.append(official_id)
+                claims.append({
+                    "text": f"2022级海南校区入学须知列有{list_text}",
+                    "evidence_ids": [official_id],
+                    "certainty": "official",
+                })
+                unresolved.extend(str(value) for value in official.get("uncertainty", []) if str(value))
+            else:
+                unresolved.append("尚未取得学校官网可用的报到材料清单")
+            if public:
+                public_id = str(public["evidence_id"])
+                public_text = str(public.get("text", ""))
+                temperature = re.search(r"年平均气温\s*([0-9.]+)\s*℃", public_text)
+                sunshine = re.search(r"年日照时数(?:约)?\s*([0-9]+)\s*(?:h|小时)", public_text, re.IGNORECASE)
+                climate_facts = []
+                if temperature:
+                    climate_facts.append(f"年平均气温约{temperature.group(1)}℃")
+                if sunshine:
+                    climate_facts.append(f"年日照约{sunshine.group(1)}小时")
+                if re.search(r"5\s*[至～~-]\s*10月|5月至10月", public_text):
+                    climate_facts.append("雨季主要集中在5月至10月")
+                fact_text = "、".join(climate_facts) or "光照和降雨具有明显的热带岛屿气候特征"
+                paragraphs.append(
+                    f"生活用品方面，陵水气候资料显示当地{fact_text}。"
+                    "因此建议带防晒用品、轻薄速干衣物和便携雨具；这是根据气候作出的生活建议，不是学校强制清单。"
+                    f" [{public_id}]"
+                )
+                citations.append(public_id)
+                claims.append({
+                    "text": f"陵水{fact_text}，适合准备防晒、轻薄衣物和雨具",
+                    "evidence_ids": [public_id],
+                    "certainty": "public",
+                })
+                unresolved.extend(str(value) for value in public.get("uncertainty", []) if str(value))
+            return {
+                "answer": "\n\n".join(paragraphs),
+                "citations": citations,
+                "claims": claims,
+                "unresolved": list(dict.fromkeys(unresolved)),
+            }
+
         paragraphs: List[str] = []
         citations: List[str] = []
         claims: List[Dict[str, object]] = []
         unresolved: List[str] = []
-        question_type = str((context_packet.get("answer_plan") or {}).get("question_type", "campus_fact"))
         query = str(context_packet.get("query", ""))
         for index, item in enumerate(evidence):
             evidence_id = str(item["evidence_id"])
@@ -151,6 +265,12 @@ class ExtractiveComposer:
             elif authority in {"official_policy", "official_guidance"}:
                 prefix = "根据现有学校材料，"
                 certainty = "official"
+            elif authority == "official_web":
+                prefix = "学校官网显示，"
+                certainty = "official"
+            elif authority == "public_web":
+                prefix = "结合公开的陵水环境资料，"
+                certainty = "public"
             else:
                 prefix = "现有待核实资料显示，"
                 certainty = "unverified"
@@ -170,10 +290,15 @@ class ExtractiveComposer:
             citations.append(evidence_id)
             claims.append({"text": text, "evidence_ids": [evidence_id], "certainty": certainty})
             if item.get("date_status") != "verified" and not item.get("effective_from"):
-                if authority == "peer_experience":
+                if item.get("date_status") == "live_page":
+                    pass
+                elif item.get("date_status") == "historical_reference":
+                    unresolved.append(f"{item.get('title', '该资料')}是历史发布，当前届次仍需核对最新通知")
+                elif authority == "peer_experience":
                     unresolved.append(f"{item.get('title', '该学生资料')}的对应届次尚未完整标明")
-                else:
+                elif authority not in {"public_web"}:
                     unresolved.append(f"{item.get('title', '该资料')}的生效时间尚未核实")
+            unresolved.extend(str(value) for value in item.get("uncertainty", []) if str(value))
 
         if context_packet.get("response_mode") == "experience_only":
             unresolved.append("当前结论主要来自往届学生经验，具体安排可能随届次变化")
@@ -204,18 +329,31 @@ def _extract_json(content: str) -> Dict[str, object]:
 
 def _normalize_model_response(value: Dict[str, object]) -> Dict[str, object]:
     """Normalize harmless provider shape drift without weakening grounding checks."""
+    def normalize_reference(item: object) -> object:
+        if isinstance(item, dict) and item.get("evidence_id"):
+            item = item["evidence_id"]
+        match = re.fullmatch(r"\[?(S\d+)\]?", str(item).strip())
+        return match.group(1) if match else item
+
     normalized = dict(value)
     unresolved = normalized.get("unresolved")
     if unresolved is None:
         normalized["unresolved"] = []
     elif isinstance(unresolved, str):
-        normalized["unresolved"] = [unresolved] if unresolved.strip() else []
+        normalized["unresolved"] = (
+            [] if unresolved.strip().lower() in {"", "无", "暂无", "none", "n/a"}
+            else [unresolved]
+        )
+    elif isinstance(unresolved, list):
+        normalized["unresolved"] = [
+            item for item in unresolved
+            if str(item).strip().lower() not in {"", "无", "暂无", "none", "n/a"}
+        ]
     citations = normalized.get("citations")
     if isinstance(citations, list):
-        normalized["citations"] = [
-            match.group(1) if (match := re.fullmatch(r"\[?(S\d+)\]?", str(item).strip())) else item
-            for item in citations
-        ]
+        normalized["citations"] = [normalize_reference(item) for item in citations]
+    elif isinstance(citations, str):
+        normalized["citations"] = list(dict.fromkeys(re.findall(r"S\d+", citations)))
     claims = normalized.get("claims")
     if isinstance(claims, list):
         normalized_claims: List[object] = []
@@ -226,13 +364,75 @@ def _normalize_model_response(value: Dict[str, object]) -> Dict[str, object]:
             normalized_claim = dict(claim)
             evidence_ids = normalized_claim.get("evidence_ids")
             if isinstance(evidence_ids, list):
-                normalized_claim["evidence_ids"] = [
-                    match.group(1) if (match := re.fullmatch(r"\[?(S\d+)\]?", str(item).strip())) else item
-                    for item in evidence_ids
-                ]
+                normalized_claim["evidence_ids"] = [normalize_reference(item) for item in evidence_ids]
             normalized_claims.append(normalized_claim)
         normalized["claims"] = normalized_claims
     return normalized
+
+
+def _resolve_evidence_references(
+    value: Dict[str, object], context_packet: Dict[str, object]
+) -> Dict[str, object]:
+    """Map provider-returned evidence titles back to stable evidence IDs."""
+    references: Dict[str, str] = {}
+    for item in context_packet.get("evidence", []):
+        evidence_id = str(item.get("evidence_id", ""))
+        if not evidence_id:
+            continue
+        references[evidence_id] = evidence_id
+        references[f"[{evidence_id}]"] = evidence_id
+        references[str(item.get("title", ""))] = evidence_id
+        if item.get("source_url"):
+            references[str(item["source_url"])] = evidence_id
+
+    def resolve(reference: object) -> str:
+        if isinstance(reference, dict):
+            resolved_ids = {
+                candidate
+                for key in ("evidence_id", "source_url", "url", "title", "source")
+                if reference.get(key)
+                for candidate in [resolve(reference[key])]
+                if candidate in references.values()
+            }
+            if len(resolved_ids) == 1:
+                return next(iter(resolved_ids))
+        raw = str(reference).strip()
+        if raw in references:
+            return references[raw]
+        prefixed_id = re.match(r"^\[?(S\d+)(?:\]|\b)", raw)
+        if prefixed_id and prefixed_id.group(1) in references:
+            return prefixed_id.group(1)
+        cleaned = raw.strip("[]【】《》（）()\"' ")
+        if cleaned in references:
+            return references[cleaned]
+        title_matches = {
+            evidence_id
+            for title, evidence_id in references.items()
+            if title and not re.fullmatch(r"\[?S\d+\]?", title)
+            and (cleaned in title or title in cleaned)
+        }
+        return next(iter(title_matches)) if len(title_matches) == 1 else raw
+
+    resolved = dict(value)
+    if isinstance(resolved.get("citations"), list):
+        resolved["citations"] = list(dict.fromkeys(
+            resolve(item) for item in resolved["citations"]
+        ))
+    claims = resolved.get("claims")
+    if isinstance(claims, list):
+        updated_claims: List[object] = []
+        for claim in claims:
+            if not isinstance(claim, dict):
+                updated_claims.append(claim)
+                continue
+            updated = dict(claim)
+            if isinstance(updated.get("evidence_ids"), list):
+                updated["evidence_ids"] = list(dict.fromkeys(
+                    resolve(item) for item in updated["evidence_ids"]
+                ))
+            updated_claims.append(updated)
+        resolved["claims"] = updated_claims
+    return resolved
 
 
 class OpenAICompatibleComposer:
@@ -252,12 +452,17 @@ class OpenAICompatibleComposer:
             "你只能依据提供的 evidence 回答事实，不能使用模型记忆补充事实。"
             "不要在自然语言正文中插入 [S1]；通过 citations 和 claims.evidence_ids 返回审计引用，前端会在正文下方展示来源。"
             "学生经验要自然地说明为往届学生经验，不能说成学校规定。"
+            "official_web 是学校官网实时取得的材料；public_web 是公开网络背景，只能支撑环境事实和实用建议，不能支撑学校制度。"
+            "绝对不要把 public_web 支撑的建议说成学长学姐经验；只有 peer_experience 才能称为学生经验。"
+            "遇到 arrival_preparation，要先分清‘学校要求带的材料’和‘结合陵水环境建议带的生活用品’，不要混成一份官方清单。"
+            "回答 institution_structure 时，不得在证据没有明说的情况下推断‘二级学院’、‘与其他学院平行’或‘教学单位之一’等层级关系。"
+            "旧年份入学须知只能表述为往届官方要求，并提醒核对当前届次；可以依据气候证据合理建议防晒、轻薄速干衣物和雨具，但要说成建议。"
             "往届人数或比例不能表达成每届固定名额；政策存在也不能推导出某个班的具体名额。"
             "如果 evidence 没有最低排名，绝对不能把往届比例反推成‘班级前多少名/百分之多少就能保研’。"
             "保留必要的时间边界，但不要反复使用免责声明。can_generate 为 false 时只能说明缺少什么和下一步去哪类来源查。"
             "严格遵循 answer_plan 中的 question_type、guidance 和 response_shape。"
             "仅输出 JSON 对象，字段必须为 answer、citations、claims、unresolved。"
-            "claims 中每项必须包含 text、evidence_ids、certainty；certainty 只能是 official、experience、unverified。"
+            "claims 中每项必须包含 text、evidence_ids、certainty；certainty 只能是 official、experience、public、unverified。"
         )
         user = json.dumps(context_packet, ensure_ascii=False, separators=(",", ":"))
         payload = json.dumps({
@@ -283,7 +488,8 @@ class OpenAICompatibleComposer:
         content = result["choices"][0]["message"]["content"]
         if isinstance(content, list):
             content = "".join(str(item.get("text", "")) for item in content if isinstance(item, dict))
-        return _normalize_model_response(_extract_json(str(content)))
+        normalized = _normalize_model_response(_extract_json(str(content)))
+        return _resolve_evidence_references(normalized, context_packet)
 
 
 def validate_composition(
@@ -312,18 +518,39 @@ def validate_composition(
 
     evidence = {str(item["evidence_id"]): item for item in context_packet.get("evidence", [])}
     answer_plan = context_packet.get("answer_plan") or {}
+    visible = display_answer(str(answer or ""))
     if answer_plan.get("question_type") == "historical_outcome":
         evidence_has_rank = any(
             any(term in str(item.get("text", "")) for term in ("最低排名", "排名前", "班级前", "排到第"))
             for item in evidence.values()
         )
-        visible = display_answer(str(answer or ""))
         inferred_rank = bool(re.search(
             r"(?:(?:名额|排名|班级前)[^。]{0,24}\d+(?:\.\d+)?%|排到第\s*\d+)",
             visible,
         ))
         if inferred_rank and not evidence_has_rank:
             errors.append("historical_outcome_inferred_rank_without_evidence")
+    if answer_plan.get("question_type") == "arrival_preparation":
+        practical_terms = ("防晒", "速干", "轻薄", "雨具", "雨伞", "雨衣", "防潮", "炎热", "潮湿", "高温", "多雨")
+        gives_environment_advice = any(term in visible for term in practical_terms)
+        public_ids = {
+            evidence_id for evidence_id, item in evidence.items()
+            if item.get("authority_tier") == "public_web"
+        }
+        if gives_environment_advice and not public_ids.intersection(str(item) for item in citations):
+            errors.append("arrival_environment_advice_without_public_web_citation")
+    if answer_plan.get("question_type") == "institution_structure":
+        hierarchy_terms = ("二级学院", "与其他学院平行", "教学单位之一")
+        for term in hierarchy_terms:
+            if term in visible and not any(term in str(item.get("text", "")) for item in evidence.values()):
+                errors.append(f"institution_hierarchy_inferred_without_evidence:{term}")
+    peer_language = any(term in visible for term in ("学长学姐", "往届学生经验", "学生经验"))
+    cited_peer = any(
+        evidence.get(str(citation), {}).get("authority_tier") == "peer_experience"
+        for citation in citations
+    )
+    if peer_language and not cited_peer:
+        errors.append("student_experience_language_without_peer_evidence")
     for citation in citations:
         if citation not in evidence:
             errors.append(f"unknown_citation:{citation}")
@@ -346,14 +573,18 @@ def validate_composition(
             errors.append(f"claim_unknown_evidence:{index}")
             continue
         certainty = claim.get("certainty")
+        if certainty not in {"official", "experience", "public", "unverified"}:
+            errors.append(f"claim_invalid_certainty:{index}")
         if any(item.get("authority_tier") == "peer_experience" for item in cited) and certainty != "experience":
             errors.append(f"peer_claim_not_labeled_experience:{index}")
         if certainty == "official" and not any(
-            item.get("authority_tier") in {"official_policy", "official_guidance"}
+            item.get("authority_tier") in {"official_policy", "official_guidance", "official_web"}
             and item.get("assertion_policy") not in {"navigation_only", "do_not_assert", "do_not_assert_until_ocr"}
             for item in cited
         ):
             errors.append(f"official_claim_without_official_evidence:{index}")
+        if cited and all(item.get("authority_tier") == "public_web" for item in cited) and certainty != "public":
+            errors.append(f"public_web_claim_not_labeled_public:{index}")
     return not errors, errors
 
 

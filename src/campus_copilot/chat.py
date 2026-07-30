@@ -12,6 +12,8 @@ from .composition import (
     validate_composition,
 )
 from .context_builder import build_context_packet
+from .answer_planning import build_answer_plan
+from .web_retrieval import NullWebRetriever, WebRetriever
 
 
 FOLLOW_UP_MARKERS = ("那", "这个", "它", "还有", "上面", "刚才", "呢", "具体", "怎么办", "为什么")
@@ -72,6 +74,7 @@ class GroundedChatService:
         composer: Optional[AnswerComposer] = None,
         sessions: Optional[SessionStore] = None,
         provider_status: Optional[Dict[str, object]] = None,
+        web_retriever: Optional[WebRetriever] = None,
     ):
         if composer is None:
             composer, detected_status = configured_composer()
@@ -81,6 +84,49 @@ class GroundedChatService:
         self.sessions = sessions or SessionStore()
         self.provider_status = provider_status or {"mode": "custom", "adapter": composer.name}
         self.fallback = ExtractiveComposer()
+        self.web_retriever = web_retriever or NullWebRetriever()
+
+    @staticmethod
+    def _web_routes(fallback_route: str) -> List[str]:
+        if fallback_route == "official_and_public_web_discovery":
+            return ["official", "public"]
+        if fallback_route == "official_web_discovery":
+            return ["official"]
+        if fallback_route == "public_web_discovery":
+            return ["public"]
+        return []
+
+    def _enrich_with_web(self, query: str, retrieval: Dict[str, object], top_k: int) -> Dict[str, object]:
+        plan = build_answer_plan(query, str(retrieval.get("answerability", "insufficient")))
+        routes = self._web_routes(str(plan["fallback_route"]))
+        if not routes:
+            return retrieval
+        web_search = self.web_retriever.search(query, routes, min(4, top_k))
+        enriched = dict(retrieval)
+        enriched["web_search"] = {key: value for key, value in web_search.items() if key != "results"}
+        web_results = list(web_search.get("results", []))
+        if not web_results:
+            return enriched
+
+        question_type = str(plan["question_type"])
+        if question_type in {"arrival_preparation", "institution_structure"}:
+            # These are explicitly web-governed intents. Weak local passages
+            # must not become evidence merely because they share campus words.
+            merged_results = web_results
+        else:
+            merged_results = web_results + list(retrieval.get("results", []))
+        enriched["results"] = merged_results[:top_k]
+        has_official = any(item.get("authority_tier") == "official_web" for item in web_results)
+        has_public = any(item.get("authority_tier") == "public_web" for item in web_results)
+        if has_official and has_public:
+            enriched["answerability"] = "web_supported_mixed"
+        elif has_official:
+            enriched["answerability"] = "web_supported"
+        else:
+            enriched["answerability"] = "public_web_supported"
+        enriched["retrieval_mode"] = str(retrieval.get("retrieval_mode", "local")) + "+curated_live_web"
+        enriched["requires_uncertainty_label"] = any(item.get("uncertainty") for item in web_results)
+        return enriched
 
     def ask(
         self,
@@ -104,6 +150,7 @@ class GroundedChatService:
             if coverage is not None and float(coverage) < 0.6:
                 retrieval["answerability"] = "insufficient_contextual_evidence"
                 retrieval["insufficient_reason"] = "top_evidence_does_not_cover_enough_of_the_prior_topic"
+        retrieval = self._enrich_with_web(retrieval_query, retrieval, top_k)
         retrieval["query"] = query
         context = build_context_packet(retrieval, history)
 
@@ -154,4 +201,6 @@ class GroundedChatService:
         self.sessions.reset(session_id)
 
     def status(self) -> Dict[str, object]:
-        return dict(self.provider_status)
+        status = dict(self.provider_status)
+        status["web_retrieval"] = self.web_retriever.status()
+        return status

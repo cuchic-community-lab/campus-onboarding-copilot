@@ -35,6 +35,52 @@ class FakeRetriever:
         }
 
 
+def web_result(source_id, authority, text):
+    return {
+        "document_id": source_id,
+        "chunk_id": "web-" + source_id,
+        "title": source_id,
+        "text": text,
+        "chunk_type": "web_excerpt",
+        "heading_path": "实时检索",
+        "page_number": None,
+        "tags": ["live_web"],
+        "authority_tier": authority,
+        "assertion_policy": "assert_with_live_citation" if authority == "official_web" else "cite_as_public_context",
+        "source_url": "https://example.test/" + source_id,
+        "cohort": None,
+        "academic_year": None,
+        "student_level": "all",
+        "major": None,
+        "campus": "Hainan",
+        "uploaded_at": None,
+        "published_at": "2022-08-09" if authority == "official_web" else None,
+        "effective_from": None,
+        "date_status": "historical_reference" if authority == "official_web" else "climate_background",
+        "uncertainty": [],
+        "retrieval_origin": "live_web",
+        "web_source_kind": "official" if authority == "official_web" else "public",
+        "fetched_at": "2026-07-30T15:00:00+0800",
+        "score": 1.0,
+        "score_explanation": {"registry_match": 1.0},
+    }
+
+
+class FakeWebRetriever:
+    name = "fake_web"
+
+    def search(self, query, routes, top_k=4):
+        results = []
+        if "official" in routes:
+            results.append(web_result("arrival-guide", "official_web", "报到时须带录取通知书、密封档案和照片。"))
+        if "public" in routes:
+            results.append(web_result("lingshui-climate", "public_web", "陵水年平均气温25℃，5至10月为雨季。"))
+        return {"executed": True, "provider": self.name, "status": "success", "routes": list(routes), "results": results, "errors": []}
+
+    def status(self):
+        return {"mode": "live", "provider": self.name}
+
+
 class ChatTest(unittest.TestCase):
     def test_insufficient_evidence_bypasses_model_composer(self):
         retriever = FakeRetriever()
@@ -110,6 +156,28 @@ class ChatTest(unittest.TestCase):
         self.assertEqual(result["answerability"], "insufficient_contextual_evidence")
         self.assertEqual(result["citations"], [])
         self.assertIn("不能把其他相似内容当成答案", result["answer"])
+
+    def test_arrival_question_replaces_irrelevant_local_passage_with_governed_web_sources(self):
+        service = GroundedChatService(
+            FakeRetriever(), composer=ExtractiveComposer(), web_retriever=FakeWebRetriever()
+        )
+        result = service.ask("开学报到要带些什么？")
+        self.assertEqual(result["answerability"], "web_supported_mixed")
+        self.assertTrue(result["answer_plan"]["web_search_executed"])
+        self.assertEqual(result["answer_plan"]["web_search_provider"], "fake_web")
+        self.assertEqual([item["authority_tier"] for item in result["evidence"]], ["official_web", "public_web"])
+        self.assertNotIn("宿舍问答", [item["title"] for item in result["evidence"]])
+        self.assertIn("录取通知书", result["answer"])
+        self.assertIn("年平均气温约25℃", result["answer"])
+        self.assertIn("不是学校强制清单", result["answer"])
+
+    def test_organization_question_uses_only_official_web_result(self):
+        service = GroundedChatService(
+            FakeRetriever(), composer=ExtractiveComposer(), web_retriever=FakeWebRetriever()
+        )
+        result = service.ask("中传的组织架构是什么？")
+        self.assertEqual(result["answerability"], "web_supported")
+        self.assertEqual([item["authority_tier"] for item in result["evidence"]], ["official_web"])
 
 
 if __name__ == "__main__":

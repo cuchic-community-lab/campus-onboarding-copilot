@@ -6,6 +6,7 @@ from campus_copilot.composition import (
     OpenAICompatibleComposer,
     ProviderConfig,
     _normalize_model_response,
+    _resolve_evidence_references,
     configured_composer,
     display_answer,
     validate_composition,
@@ -43,6 +44,12 @@ class CompositionTest(unittest.TestCase):
         self.assertEqual(normalized["unresolved"], ["研究生是否适用仍未知"])
         self.assertEqual(normalized["claims"], value["claims"])
 
+    def test_model_no_unresolved_marker_is_normalized_to_empty_list(self):
+        normalized = _normalize_model_response({
+            "answer": "已回答。", "citations": [], "claims": [], "unresolved": ["无"]
+        })
+        self.assertEqual(normalized["unresolved"], [])
+
     def test_bracketed_structured_evidence_ids_are_normalized(self):
         value = {
             "answer": "往届85人中有14人保研。",
@@ -53,6 +60,84 @@ class CompositionTest(unittest.TestCase):
         normalized = _normalize_model_response(value)
         self.assertEqual(normalized["citations"], ["S1"])
         self.assertEqual(normalized["claims"][0]["evidence_ids"], ["S1"])
+
+    def test_string_citations_are_normalized_for_provider_shape_drift(self):
+        normalized = _normalize_model_response({
+            "answer": "中传校内单位分为四类。",
+            "citations": "[S1]",
+            "claims": [],
+            "unresolved": [],
+        })
+        self.assertEqual(normalized["citations"], ["S1"])
+
+    def test_object_citations_are_normalized_for_provider_shape_drift(self):
+        normalized = _normalize_model_response({
+            "answer": "中传校内单位分为四类。",
+            "citations": [{"evidence_id": "S1", "source_url": "https://example.test"}],
+            "claims": [{
+                "text": "分为四类",
+                "evidence_ids": [{"evidence_id": "S1", "excerpt": "党群机构"}],
+                "certainty": "official",
+            }],
+            "unresolved": [],
+        })
+        self.assertEqual(normalized["citations"], ["S1"])
+        self.assertEqual(normalized["claims"][0]["evidence_ids"], ["S1"])
+
+    def test_source_url_object_reference_is_resolved_to_stable_id(self):
+        context = packet(authority="official_web")
+        value = {
+            "answer": "中传校内单位分为四类。",
+            "citations": [{
+                "source": "学校官网",
+                "url": "https://example.test/source",
+                "retrieved_at": "2026-07-30T15:24:53+0800",
+            }],
+            "claims": [{"text": "分为四类", "evidence_ids": ["S1"], "certainty": "official"}],
+            "unresolved": [],
+        }
+        resolved = _resolve_evidence_references(value, context)
+        self.assertEqual(resolved["citations"], ["S1"])
+
+    def test_evidence_titles_are_resolved_to_stable_ids(self):
+        context = packet(authority="official_web")
+        value = {
+            "answer": "可以办理。",
+            "citations": ["宿舍问答"],
+            "claims": [{"text": "可以办理", "evidence_ids": ["宿舍问答"], "certainty": "official"}],
+            "unresolved": [],
+        }
+        resolved = _resolve_evidence_references(value, context)
+        self.assertEqual(resolved["citations"], ["S1"])
+        self.assertEqual(resolved["claims"][0]["evidence_ids"], ["S1"])
+
+    def test_decorated_evidence_titles_are_resolved_to_stable_ids(self):
+        context = packet(authority="official_web")
+        value = {
+            "answer": "可以办理。",
+            "citations": ["《宿舍问答》（学校官网）"],
+            "claims": [{
+                "text": "可以办理",
+                "evidence_ids": ["《宿舍问答》（学校官网）"],
+                "certainty": "official",
+            }],
+            "unresolved": [],
+        }
+        resolved = _resolve_evidence_references(value, context)
+        self.assertEqual(resolved["citations"], ["S1"])
+        self.assertEqual(resolved["claims"][0]["evidence_ids"], ["S1"])
+
+    def test_prefixed_title_reference_is_resolved_to_stable_id(self):
+        context = packet(authority="official_web")
+        value = {
+            "answer": "可以办理。",
+            "citations": ["[S1] 宿舍问答"],
+            "claims": [{"text": "可以办理", "evidence_ids": ["[S1] 宿舍问答"], "certainty": "official"}],
+            "unresolved": [],
+        }
+        resolved = _resolve_evidence_references(value, context)
+        self.assertEqual(resolved["citations"], ["S1"])
+        self.assertEqual(resolved["claims"][0]["evidence_ids"], ["S1"])
 
     def test_makers_preset_selects_gateway_and_default_model(self):
         with patch.dict(
@@ -131,6 +216,21 @@ class CompositionTest(unittest.TestCase):
         self.assertFalse(valid)
         self.assertIn("historical_outcome_inferred_rank_without_evidence", errors)
 
+    def test_validator_rejects_inferred_institution_hierarchy(self):
+        context = packet(authority="official_web")
+        context["query"] = "中传的组织架构是什么？"
+        context["answer_plan"] = {"question_type": "institution_structure"}
+        context["evidence"][0]["text"] = "实行一套班子三块牌子。"
+        invalid = {
+            "answer": "海南国际学院是与其他学院平行的二级学院。",
+            "citations": ["S1"],
+            "claims": [{"text": "是二级学院", "evidence_ids": ["S1"], "certainty": "official"}],
+            "unresolved": [],
+        }
+        valid, errors = validate_composition(invalid, context)
+        self.assertFalse(valid)
+        self.assertTrue(any(error.startswith("institution_hierarchy_inferred_without_evidence") for error in errors))
+
     def test_validator_rejects_peer_claim_presented_as_official(self):
         context = packet()
         invalid = {
@@ -168,6 +268,47 @@ class CompositionTest(unittest.TestCase):
         result = ExtractiveComposer().generate(context)
         self.assertEqual(result["citations"], ["S1", "S2", "S3"])
         self.assertIn("2.1m×1.01m", result["answer"])
+
+    def test_public_web_claim_requires_public_certainty(self):
+        context = packet(authority="public_web")
+        context["evidence"][0]["assertion_policy"] = "cite_as_public_context"
+        invalid = {
+            "answer": "陵水全年高温。",
+            "citations": ["S1"],
+            "claims": [{"text": "陵水全年高温", "evidence_ids": ["S1"], "certainty": "official"}],
+            "unresolved": [],
+        }
+        valid, errors = validate_composition(invalid, context)
+        self.assertFalse(valid)
+        self.assertIn("public_web_claim_not_labeled_public:0", errors)
+
+    def test_arrival_advice_cannot_use_only_school_notice_as_climate_evidence(self):
+        context = packet(authority="official_web")
+        context["query"] = "开学报到要带些什么？"
+        context["answer_plan"] = {"question_type": "arrival_preparation"}
+        invalid = {
+            "answer": "报到带录取通知书，另外陵水炎热潮湿，建议带防晒和雨具。",
+            "citations": ["S1"],
+            "claims": [{"text": "带录取通知书", "evidence_ids": ["S1"], "certainty": "official"}],
+            "unresolved": [],
+        }
+        valid, errors = validate_composition(invalid, context)
+        self.assertFalse(valid)
+        self.assertIn("arrival_environment_advice_without_public_web_citation", errors)
+
+    def test_public_web_advice_cannot_be_called_student_experience(self):
+        context = packet(authority="public_web")
+        context["query"] = "开学报到要带些什么？"
+        context["answer_plan"] = {"question_type": "arrival_preparation"}
+        invalid = {
+            "answer": "根据往届学长学姐经验，建议带防晒用品。",
+            "citations": ["S1"],
+            "claims": [{"text": "建议带防晒用品", "evidence_ids": ["S1"], "certainty": "public"}],
+            "unresolved": [],
+        }
+        valid, errors = validate_composition(invalid, context)
+        self.assertFalse(valid)
+        self.assertIn("student_experience_language_without_peer_evidence", errors)
 
 
 if __name__ == "__main__":

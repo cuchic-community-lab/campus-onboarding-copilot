@@ -10,6 +10,7 @@ from .retrieval import HybridRetriever
 from .server import serve
 from .service import audit_corpus, build_knowledge_base, corpus_stats
 from .sync import sync_corpus
+from .web_retrieval import configured_web_retriever
 
 
 def _print(value: object) -> None:
@@ -54,7 +55,9 @@ def main() -> None:
         _print(build_context_packet(result) if args.context else result)
     elif args.command == "chat":
         profile = {key: value for key, value in {"cohort": args.cohort, "major": args.major, "student_level": args.student_level}.items() if value}
-        _print(GroundedChatService(HybridRetriever(DB_PATH)).ask(args.query, profile=profile, top_k=args.top_k))
+        _print(GroundedChatService(
+            HybridRetriever(DB_PATH), web_retriever=configured_web_retriever()
+        ).ask(args.query, profile=profile, top_k=args.top_k))
     elif args.command == "serve":
         serve(args.host, args.port)
     elif args.command == "audit":

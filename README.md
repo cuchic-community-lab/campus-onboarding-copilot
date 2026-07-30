@@ -72,7 +72,8 @@ question-answer boundaries.
 
 ## Run
 
-The core prototype has no required third-party Python packages.
+The runtime has one lightweight required parser, `pypdf`, because governed
+web retrieval may read registered official PDF sources in real time.
 
 ```bash
 make sync       # download manifest, Q&A, and public files
@@ -85,24 +86,24 @@ make demo       # run an uncertainty-sensitive example query
 make serve      # open http://127.0.0.1:8000
 ```
 
-PDF, DOCX, and XLSX body extraction is enabled when optional parser packages
-are installed:
+DOCX and XLSX body extraction, plus the development toolchain, are enabled
+when optional packages are installed:
 
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -e '.[parsers,dev]'
 ```
 
-Without them, the full FAQ and links are searchable and binary documents are
-kept in the catalog with `metadata_only` parse status. The system will not
-pretend an unparsed PDF supports an answer.
+Without the optional packages, the full FAQ, links, and PDFs remain supported;
+DOCX/XLSX files are kept in the catalog with `metadata_only` parse status. The
+system will not pretend an unparsed document supports an answer.
 
 `make` automatically uses `.venv/bin/python` when that environment exists, so
 a complete index is not accidentally rebuilt with a parser-free system Python.
 
 ## API
 
-The zero-dependency server exposes:
+The lightweight standard-library HTTP server exposes:
 
 - `GET /api/health`
 - `GET /api/corpus/stats`
@@ -124,12 +125,21 @@ uses prior user intent to resolve explicit follow-ups, retrieves fresh evidence
 for every turn, and returns both an audit answer and a citation-free
 `display_answer`, plus only the cited `sources` for student-facing rendering.
 
-When local evidence is insufficient, the answer plan records one of two future
-discovery routes instead of using model memory: `official_web_discovery` for
-school-specific/current questions, or `public_web_discovery` for general topics
-such as career directions. This version exposes and tests the routing decision;
-it does not yet execute a web search. The intended official allowlist is the
-university, school, and verified official WeChat sources.
+When local evidence is insufficient, the answer plan can execute governed live
+retrieval. `config/web_sources.json` registers reviewed school and public
+sources together with query hints, authority, dates, and applicability. The
+runtime fetches the current HTML or PDF, enforces an exact HTTPS host allowlist
+to prevent SSRF, extracts a focused passage, retries transient failures, and
+caches results for 30 minutes. Retrieved school pages are labeled
+`official_web`; contextual sources such as a government climate standard remain
+separate as `public_web` and cannot substantiate school-policy claims.
+
+This is real retrieval, but deliberately not arbitrary search. New websites and
+official-account sources must first be added to the reviewed registry. Automatic
+discovery across the open web or WeChat requires a separate search provider
+(for example Tencent Web Search API or TokenHub), followed by the same domain,
+authority, freshness, and citation controls. Makers Models supplies the answer
+model; it is not itself a web-search service.
 
 `/api/context` returns the same model-ready evidence packet and response policy.
 A provider receives only this packet and must:
@@ -175,6 +185,9 @@ The preset selects `https://ai-gateway.edgeone.link/v1` and
 `CAMPUS_LLM_BASE_URL` and `CAMPUS_LLM_MODEL`, preserving provider portability.
 `GET /api/health` reports the provider, model, and whether a credential is
 configured, but never returns the credential itself.
+
+The same health response reports whether governed web retrieval is enabled.
+The web registry and fetcher contain no model credentials.
 
 ## Current corpus boundary
 

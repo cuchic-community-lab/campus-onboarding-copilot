@@ -10,6 +10,7 @@ user question + student profile
   → question-type and answer-shape planning
   → retrieval + applicability filters
   → source policy + answerability decision
+  → governed official/public web retrieval when routed
   → versioned context packet
   → LLM answer composer
   → citation and policy validator
@@ -26,7 +27,7 @@ be asked to search the database itself.
   "query": "宿舍是几人间？",
   "can_generate": true,
   "response_mode": "experience_only",
-  "model_contract_version": "campus-grounding-v3-student-ambassador",
+  "model_contract_version": "campus-grounding-v4-governed-web",
   "answer_plan": {
     "question_type": "campus_experience",
     "fallback_route": "local_knowledge",
@@ -47,6 +48,10 @@ be asked to search the database itself.
   ]
 }
 ```
+
+Live evidence adds `source_url`, `retrieved_at`, and, when known,
+`published_at`. `official_web` may support a school claim; `public_web` may
+support contextual advice but never becomes school policy.
 
 ## Implemented provider interface
 
@@ -95,6 +100,8 @@ Before returning an answer:
    source.
 7. a generated answer may not open as a document citation frame or policy-file
    recital.
+8. environment-based packing advice must cite a retrieved public source.
+9. a public webpage may not be described as student experience.
 
 The current validator implements citation existence, inline citation presence,
 claim-to-evidence linkage, official-source requirements, peer-experience
@@ -110,17 +117,23 @@ answer support.
 
 ## Discovery routing boundary
 
-The planner distinguishes three evidence paths:
+The planner distinguishes four evidence paths:
 
 1. `local_knowledge`: answer from the indexed corpus.
 2. `official_web_discovery`: search only university, school, and verified
    official-account sources for current school-specific facts.
 3. `public_web_discovery`: search reputable public sources for general topics,
    while keeping them separate from school-specific claims.
+4. `official_and_public_web_discovery`: combine an official school source with
+   a distinct public context source, for example a historical arrival checklist
+   plus Lingshui climate information.
 
-Only the first path is executed today. The latter two are explicit, tested
-handoff states so a future search adapter cannot silently broaden the trust
-boundary or use model memory as a substitute for retrieval.
+All four paths can execute today for sources registered in
+`config/web_sources.json`. The live adapter performs allowlisted HTML/PDF
+fetching; it is intentionally a curated retrieval layer rather than a general
+search engine. Arbitrary web and WeChat discovery remains a future adapter and
+must not silently broaden the trust boundary or use model memory as a substitute
+for retrieval.
 
 ## Conversation boundary
 
@@ -132,10 +145,12 @@ never treated as factual evidence. Sessions disappear when the process restarts.
 ## Rollout
 
 1. Collect failed questions and create human relevance labels.
-2. Replace the local subword baseline and compare retrieval ablations.
-3. Add claim-level entailment and temporal-conflict evaluation.
-4. Persist isolated sessions only when account and retention rules exist.
-5. Add structured student actions only after the factual answer path is
+2. Add a governed search-provider adapter for new official webpages and
+   verified official-account articles.
+3. Replace the local subword baseline and compare retrieval ablations.
+4. Add claim-level entailment and temporal-conflict evaluation.
+5. Persist isolated sessions only when account and retention rules exist.
+6. Add structured student actions only after the factual answer path is
    reliable.
 
 This order prevents fluent model output from concealing weak retrieval.

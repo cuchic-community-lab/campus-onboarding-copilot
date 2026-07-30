@@ -10,6 +10,7 @@ from .chat import GroundedChatService
 from .context_builder import build_context_packet
 from .retrieval import HybridRetriever
 from .service import corpus_stats
+from .web_retrieval import configured_web_retriever
 
 
 WEB_ROOT = PROJECT_ROOT / "web"
@@ -17,7 +18,7 @@ WEB_ROOT = PROJECT_ROOT / "web"
 
 class AppHandler(BaseHTTPRequestHandler):
     retriever = HybridRetriever(DB_PATH)
-    chat = GroundedChatService(retriever)
+    chat = GroundedChatService(retriever, web_retriever=configured_web_retriever())
 
     def _json(self, body: Dict[str, object], status: int = 200) -> None:
         payload = json.dumps(body, ensure_ascii=False, indent=2).encode("utf-8")

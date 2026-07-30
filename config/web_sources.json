@@ -1,0 +1,54 @@
+[
+  {
+    "source_id": "cuc-hainan-undergrad-arrival-guide-2022",
+    "title": "中国传媒大学2022级新生入学须知（海南校区）",
+    "url": "https://hainan.cuc.edu.cn/2022/0809/c8812a198051/page.htm",
+    "route": "official",
+    "authority_tier": "official_web",
+    "assertion_policy": "assert_as_historical_official_guidance",
+    "published_at": "2022-08-09",
+    "date_status": "historical_reference",
+    "query_terms": ["开学", "报到", "报道", "入学", "带什么", "带些什么", "准备什么", "材料", "行李"],
+    "focus_terms": ["报到时须带材料", "录取通知书", "个人档案", "户口迁移证", "党、团组织关系", "照片", "行李邮寄"],
+    "uncertainty": ["这是2022级本科生通知，当前届次必须继续核对当年最新通知"]
+  },
+  {
+    "source_id": "cuc-organization-disclosure",
+    "title": "中国传媒大学信息公开网：校内部门单位",
+    "url": "https://xxgk.cuc.edu.cn/",
+    "route": "official",
+    "authority_tier": "official_web",
+    "assertion_policy": "assert_with_live_citation",
+    "published_at": null,
+    "date_status": "live_page",
+    "query_terms": ["组织架构", "组织结构", "机构设置", "学校架构", "有哪些部门", "部门单位", "组织"],
+    "focus_terms": ["校内部门单位", "党群机构", "行政机构", "教学单位", "直（附）属单位", "党政办公室", "教务处"],
+    "uncertainty": []
+  },
+  {
+    "source_id": "cuc-hainan-institution-setting",
+    "title": "国际传媒教育学院（海南国际学院）机构设置说明",
+    "url": "https://www.cuc.edu.cn/cucnews/2022/0307/c1901a191333/page.htm",
+    "route": "official",
+    "authority_tier": "official_web",
+    "assertion_policy": "assert_with_live_citation",
+    "published_at": "2022-03-07",
+    "date_status": "historical_reference",
+    "query_terms": ["海南国际学院", "海南国际学院组织", "海南国际学院架构", "国际传媒教育学院", "一套班子", "三块牌子", "学院组织"],
+    "focus_terms": ["一套班子三块牌子", "国际传媒教育学院", "海南国际学院", "境外学生教育中心"],
+    "uncertainty": ["机构设置可能调整，现状应同时参考学院最新发布"]
+  },
+  {
+    "source_id": "lingshui-government-climate-standard",
+    "title": "海南省地方标准：陵水自然环境与气候",
+    "url": "https://amr.hainan.gov.cn/zw/tztg/202511/P020251107386037241868.pdf",
+    "route": "public",
+    "authority_tier": "public_web",
+    "assertion_policy": "cite_as_public_context",
+    "published_at": "2025-11-07",
+    "date_status": "reference_standard",
+    "query_terms": ["开学", "报到", "报道", "入学", "带什么", "带些什么", "准备什么", "行李", "陵水", "气候", "天气", "穿什么", "衣服", "防晒", "雨"],
+    "focus_terms": ["自然环境", "气候", "年平均气温", "年日照时数", "极端最高温度", "年降雨量", "雨季主要集中在5～10月份", "光照充足", "高温多雨"],
+    "uncertainty": ["这是陵水长期气候背景，不是报到日期附近的短期天气预报"]
+  }
+]
