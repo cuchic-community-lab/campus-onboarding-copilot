@@ -50,5 +50,46 @@
     "query_terms": ["开学", "报到", "报道", "入学", "带什么", "带些什么", "准备什么", "行李", "陵水", "气候", "天气", "穿什么", "衣服", "防晒", "雨"],
     "focus_terms": ["自然环境", "气候", "年平均气温", "年日照时数", "极端最高温度", "年降雨量", "雨季主要集中在5～10月份", "光照充足", "高温多雨"],
     "uncertainty": ["这是陵水长期气候背景，不是报到日期附近的短期天气预报"]
+  },
+  {
+    "source_id": "cuc-hainan-visual-communication-credential",
+    "title": "海南国际学院：视觉传达设计（中外合作办学）专业介绍",
+    "url": "https://hainan.cuc.edu.cn/2023/0920/c13903a211948/page.htm",
+    "route": "official",
+    "authority_tier": "official_web",
+    "assertion_policy": "assert_with_live_citation",
+    "published_at": "2024-11-22",
+    "date_status": "live_page",
+    "query_terms": ["毕业证", "毕业证书", "学位证", "学位证书", "证书", "中外合办", "中外合作办学", "字样"],
+    "focus_terms": ["中国传媒大学毕业证书", "学士学位", "中外联合培养方案", "达到毕业要求"],
+    "uncertainty": ["该专业页说明颁发何种证书，但没有展示证书样张或直接说明印刷字样"]
+  },
+  {
+    "source_id": "cuc-2026-joint-program-credential",
+    "title": "中国传媒大学2026年中外合作办学本科专业介绍",
+    "url": "https://icuc.cuc.edu.cn/2026/0624/c2653a272085/page.htm",
+    "route": "official",
+    "authority_tier": "official_web",
+    "assertion_policy": "assert_with_live_citation",
+    "published_at": "2026-06-24",
+    "date_status": "live_page",
+    "query_terms": ["毕业证", "毕业证书", "学位证", "学位证书", "证书", "中外合办", "中外合作办学", "字样"],
+    "focus_terms": ["中国传媒大学毕业证书", "中国传媒大学学士学位", "毕业和学位条件", "中外联合专业培养方案"],
+    "uncertainty": ["专业介绍确认授予的证书类型，但没有展示证书样张或直接说明印刷字样"]
+  },
+  {
+    "source_id": "huaue-cuc-joint-program-faq-2024",
+    "title": "中国传媒大学2024年中外合作办学专业常见问题解答（公开转载）",
+    "url": "http://www.huaue.com/zwhz2024/202462695823.htm",
+    "route": "public",
+    "authority_tier": "public_web",
+    "assertion_policy": "cite_as_public_reference",
+    "published_at": "2024-06-26",
+    "date_status": "verified_snapshot",
+    "query_terms": ["毕业证", "毕业证书", "学位证", "学位证书", "证书", "中外合办", "中外合作办学", "字样", "一样吗", "区别"],
+    "focus_terms": ["毕业证、学位证和其他专业一样吗", "没有不同", "完全一致", "中国传媒大学毕业证书"],
+    "verified_excerpt": "页面标题：中国传媒大学2024年中外合作办学专业常见问题解答。页面标注来源：中国传媒大学。中外合作办学专业毕业后授予几个证书？答：中外合作办学专业在满足相应要求后，授予中国传媒大学毕业证书、学士学位证书；满足外方合作院校相应要求后，授予外方学士学位证书。中外合作办学专业毕业证、学位证和其他专业一样吗？答：没有不同，与其他专业完全一致。",
+    "verified_at": "2026-07-30T16:45:00+0800",
+    "uncertainty": ["这是第三方网站转载并标注来源为中国传媒大学，未找到学校官网原始FAQ页面或证书样张，应作为公开参考而非官网直接证据"]
   }
 ]

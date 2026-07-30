@@ -23,10 +23,15 @@ INSTITUTION_STRUCTURE_TERMS = (
     "组织架构", "组织结构", "机构设置", "学校架构", "学院架构", "有哪些部门",
     "部门单位", "领导班子",
 )
+CREDENTIAL_TERMS = (
+    "毕业证", "毕业证书", "学位证", "学位证书", "证书字样", "双证", "学信网",
+)
 
 
 def classify_question(query: str) -> str:
     compact = query.replace(" ", "").lower()
+    if any(term in compact for term in CREDENTIAL_TERMS):
+        return "credential_wording"
     if any(term in compact for term in ARRIVAL_PREPARATION_TERMS):
         return "arrival_preparation"
     if any(term in compact for term in INSTITUTION_STRUCTURE_TERMS):
@@ -51,8 +56,8 @@ def build_answer_plan(query: str, answerability: str) -> Dict[str, object]:
         "mixed_sources_review_required",
         "experience_only",
     }
-    requires_web_enrichment = question_type == "arrival_preparation"
-    if question_type == "arrival_preparation":
+    requires_web_enrichment = question_type in {"arrival_preparation", "credential_wording"}
+    if question_type in {"arrival_preparation", "credential_wording"}:
         fallback_route = "official_and_public_web_discovery"
     elif question_type == "institution_structure":
         fallback_route = "official_web_discovery"
@@ -73,6 +78,12 @@ def build_answer_plan(query: str, answerability: str) -> Dict[str, object]:
             "Use the current official organization page. Summarize the top-level categories and "
             "explain the documented Hainan institution relationship when relevant. Do not infer "
             "secondary-college hierarchy or peer relationships unless the evidence says so."
+        ),
+        "credential_wording": (
+            "Treat certificate award, certificate wording, and certificate appearance as separate claims. "
+            "Prefer a direct official FAQ or certificate sample. An official page that only says which "
+            "degree is awarded cannot prove what is or is not printed on the certificate. Use a public "
+            "FAQ only as a clearly labeled reference and preserve the remaining verification boundary."
         ),
         "historical_outcome": (
             "Answer with the observed cohort result first. Explicitly distinguish an observed "

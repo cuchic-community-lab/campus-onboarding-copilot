@@ -134,6 +134,19 @@ caches results for 30 minutes. Retrieved school pages are labeled
 `official_web`; contextual sources such as a government climate standard remain
 separate as `public_web` and cannot substantiate school-policy claims.
 
+Retrieved candidates are not automatically answer evidence. For question types
+with explicit objects, the answer layer checks required aspects before adopting
+a passage. A certificate-wording question must be covered by
+`毕业证/学位证/证书`; a passage that only shares `中外合作办学` is discarded even
+when its lexical score is high. Credential questions always run official and
+public web enrichment, then rank local and web candidates by question coverage,
+direct-answer presence, authority, and retrieval score. An official page that
+only states which certificate is awarded cannot prove what is printed on it.
+
+Legacy HTTP-only pages are never added to the live-fetch allowlist. A manually
+verified excerpt may be stored as a dated `verified_web_snapshot`, labeled as a
+public reference with its uncertainty, while live fetching remains HTTPS-only.
+
 This is real retrieval, but deliberately not arbitrary search. New websites and
 official-account sources must first be added to the reviewed registry. Automatic
 discovery across the open web or WeChat requires a separate search provider

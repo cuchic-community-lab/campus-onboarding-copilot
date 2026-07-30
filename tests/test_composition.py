@@ -310,6 +310,24 @@ class CompositionTest(unittest.TestCase):
         self.assertFalse(valid)
         self.assertIn("student_experience_language_without_peer_evidence", errors)
 
+    def test_credential_wording_claim_requires_direct_evidence(self):
+        context = packet(authority="official_web")
+        context["query"] = "毕业证有中外合办字样吗？"
+        context["answer_plan"] = {"question_type": "credential_wording"}
+        context["evidence"][0].update({
+            "text": "达到条件后授予中国传媒大学毕业证书和学士学位。",
+            "evidence_coverage": {"direct_answer": False},
+        })
+        invalid = {
+            "answer": "不会标注中外合作办学字样。",
+            "citations": ["S1"],
+            "claims": [{"text": "不会标注", "evidence_ids": ["S1"], "certainty": "official"}],
+            "unresolved": [],
+        }
+        valid, errors = validate_composition(invalid, context)
+        self.assertFalse(valid)
+        self.assertIn("credential_wording_claim_without_direct_evidence", errors)
+
 
 if __name__ == "__main__":
     unittest.main()

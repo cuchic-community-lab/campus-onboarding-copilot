@@ -10,7 +10,7 @@ SYSTEM_RULES = [
     "Preserve uncertainty words such as likely, inferred, expected, and unknown.",
     "If official evidence is required but missing, say what must be confirmed and abstain.",
     "Respect cohort, major, campus, and effective-date applicability.",
-    "Official web evidence may support school facts; public web evidence may support only public context and clearly labeled practical recommendations.",
+    "Official web evidence may support school facts. Public web evidence must be labeled as a public reference and cannot be upgraded into an official school claim.",
     "Never present a historical arrival notice or a public-web recommendation as the current official requirement.",
 ]
 
@@ -23,6 +23,7 @@ GENERATABLE_MODES = {
     "web_supported",
     "public_web_supported",
     "web_supported_mixed",
+    "supported_with_unresolved_wording",
 }
 
 
@@ -52,6 +53,7 @@ def build_context_packet(
             "retrieval_origin": result.get("retrieval_origin", "local_knowledge"),
             "web_source_kind": result.get("web_source_kind"),
             "fetched_at": result.get("fetched_at"),
+            "evidence_coverage": result.get("evidence_coverage"),
         })
     answer_plan = build_answer_plan(str(retrieval.get("query", "")), status)
     web_search = retrieval.get("web_search") or {}

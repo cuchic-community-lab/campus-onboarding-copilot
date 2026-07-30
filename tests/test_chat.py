@@ -81,6 +81,30 @@ class FakeWebRetriever:
         return {"mode": "live", "provider": self.name}
 
 
+class CredentialWebRetriever(FakeWebRetriever):
+    def search(self, query, routes, top_k=4):
+        results = [
+            web_result(
+                "credential-faq",
+                "public_web",
+                "中外合作办学专业毕业证、学位证和其他专业一样吗？答：没有不同，与其他专业完全一致。",
+            ),
+            web_result(
+                "credential-official",
+                "official_web",
+                "中外合作办学专业达到条件后授予中国传媒大学毕业证书和学士学位。",
+            ),
+        ]
+        return {
+            "executed": True,
+            "provider": self.name,
+            "status": "success",
+            "routes": list(routes),
+            "results": results,
+            "errors": [],
+        }
+
+
 class ChatTest(unittest.TestCase):
     def test_insufficient_evidence_bypasses_model_composer(self):
         retriever = FakeRetriever()
@@ -178,6 +202,46 @@ class ChatTest(unittest.TestCase):
         result = service.ask("中传的组织架构是什么？")
         self.assertEqual(result["answerability"], "web_supported")
         self.assertEqual([item["authority_tier"] for item in result["evidence"]], ["official_web"])
+
+    def test_credential_question_discards_campus_culture_candidate_and_uses_web(self):
+        retriever = FakeRetriever()
+
+        def wrong_local_search(query, top_k, profile):
+            result = FakeRetriever().search(query, top_k, profile)
+            result["results"][0].update({
+                "title": "中外合办校园文化问答",
+                "text": "这里有没有英国校园文化？回答：没有。",
+                "score": 99.0,
+            })
+            return result
+
+        retriever.search = wrong_local_search
+        service = GroundedChatService(
+            retriever,
+            composer=ExtractiveComposer(),
+            web_retriever=CredentialWebRetriever(),
+        )
+        result = service.ask("我们的毕业证有中外合办字样吗？")
+        self.assertTrue(result["answer_plan"]["web_search_executed"])
+        self.assertNotIn("中外合办校园文化问答", [item["title"] for item in result["evidence"]])
+        self.assertIn("没有不同", result["answer"])
+        self.assertIn("不是证书样张", result["answer"])
+        self.assertIn("授予中国传媒大学毕业证书", result["answer"])
+
+    def test_credential_question_with_only_indirect_official_source_preserves_boundary(self):
+        class OfficialOnly(CredentialWebRetriever):
+            def search(self, query, routes, top_k=4):
+                result = super().search(query, routes, top_k)
+                result["results"] = [result["results"][1]]
+                return result
+
+        service = GroundedChatService(
+            FakeRetriever(), composer=ExtractiveComposer(), web_retriever=OfficialOnly()
+        )
+        result = service.ask("我们的毕业证有中外合办字样吗？")
+        self.assertEqual(result["answerability"], "supported_with_unresolved_wording")
+        self.assertIn("不能仅凭", result["answer"])
+        self.assertIn("单独不能证明", result["answer"])
 
 
 if __name__ == "__main__":

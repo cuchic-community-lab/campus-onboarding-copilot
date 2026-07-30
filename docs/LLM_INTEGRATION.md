@@ -102,6 +102,9 @@ Before returning an answer:
    recital.
 8. environment-based packing advice must cite a retrieved public source.
 9. a public webpage may not be described as student experience.
+10. a certificate-wording conclusion requires cited evidence that covers both
+    the credential object and wording/appearance; certificate-award text alone
+    cannot support a claim about printed words.
 
 The current validator implements citation existence, inline citation presence,
 claim-to-evidence linkage, official-source requirements, peer-experience

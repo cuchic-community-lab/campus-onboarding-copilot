@@ -13,6 +13,7 @@ from .composition import (
 )
 from .context_builder import build_context_packet
 from .answer_planning import build_answer_plan
+from .evidence_coverage import rank_and_filter_evidence
 from .web_retrieval import NullWebRetriever, WebRetriever
 
 
@@ -105,25 +106,44 @@ class GroundedChatService:
         enriched = dict(retrieval)
         enriched["web_search"] = {key: value for key, value in web_search.items() if key != "results"}
         web_results = list(web_search.get("results", []))
-        if not web_results:
+        question_type = str(plan["question_type"])
+        if not web_results and question_type != "credential_wording":
             return enriched
 
-        question_type = str(plan["question_type"])
         if question_type in {"arrival_preparation", "institution_structure"}:
             # These are explicitly web-governed intents. Weak local passages
             # must not become evidence merely because they share campus words.
             merged_results = web_results
         else:
-            merged_results = web_results + list(retrieval.get("results", []))
+            merged_results = rank_and_filter_evidence(
+                query,
+                question_type,
+                web_results + list(retrieval.get("results", [])),
+            )
         enriched["results"] = merged_results[:top_k]
-        has_official = any(item.get("authority_tier") == "official_web" for item in web_results)
-        has_public = any(item.get("authority_tier") == "public_web" for item in web_results)
-        if has_official and has_public:
+        has_official = any(
+            item.get("authority_tier") in {"official_web", "official_policy", "official_guidance"}
+            for item in merged_results
+        )
+        has_public = any(item.get("authority_tier") == "public_web" for item in merged_results)
+        has_direct_answer = any(
+            bool(item.get("evidence_coverage", {}).get("direct_answer"))
+            for item in merged_results
+        )
+        if question_type == "credential_wording" and not merged_results:
+            enriched["answerability"] = "insufficient_question_coverage"
+            enriched["insufficient_reason"] = "evidence_does_not_cover_credential_object"
+        elif question_type == "credential_wording" and not has_direct_answer:
+            enriched["answerability"] = "supported_with_unresolved_wording"
+            enriched["insufficient_reason"] = "no_source_directly_confirms_certificate_wording"
+        elif has_official and has_public:
             enriched["answerability"] = "web_supported_mixed"
         elif has_official:
             enriched["answerability"] = "web_supported"
-        else:
+        elif has_public:
             enriched["answerability"] = "public_web_supported"
+        else:
+            enriched["answerability"] = str(retrieval.get("answerability", "insufficient"))
         enriched["retrieval_mode"] = str(retrieval.get("retrieval_mode", "local")) + "+curated_live_web"
         enriched["requires_uncertainty_label"] = any(item.get("uncertainty") for item in web_results)
         return enriched

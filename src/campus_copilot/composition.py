@@ -107,9 +107,16 @@ class ExtractiveComposer:
     name = "extractive_fallback"
 
     def generate(self, context_packet: Dict[str, object]) -> Dict[str, object]:
+        question_type = str((context_packet.get("answer_plan") or {}).get("question_type", "campus_fact"))
         if not context_packet.get("can_generate"):
             route = str((context_packet.get("answer_plan") or {}).get("fallback_route", ""))
-            if context_packet.get("response_mode") == "insufficient_contextual_evidence":
+            if question_type == "credential_wording":
+                answer = (
+                    "我这次没有找到直接说明毕业证具体字样的有效来源，所以不能拿只提到“中外合作办学”的"
+                    "相似材料替你判断。学校官网或招生问答如果没有证书样张，最稳妥的是向招生办确认具体印刷内容。"
+                )
+                unresolved = ["缺少直接说明毕业证版式或印刷字样的证据"]
+            elif context_packet.get("response_mode") == "insufficient_contextual_evidence":
                 answer = "我没有找到既符合当前追问对象、又能直接回答上一问题的材料，因此不能把其他相似内容当成答案。请补充对应人群的资料或向学校确认。"
                 unresolved = ["缺少同时匹配原问题主题和当前追问对象的证据"]
             else:
@@ -126,10 +133,9 @@ class ExtractiveComposer:
             item for item in context_packet.get("evidence", [])
             if item.get("assertion_policy") not in {"navigation_only", "do_not_assert", "do_not_assert_until_ocr"}
         ]
-        question_type = str((context_packet.get("answer_plan") or {}).get("question_type", "campus_fact"))
         evidence_limit = 3 if (
             eligible and eligible[0].get("chunk_type") == "structured_fact"
-        ) or question_type == "arrival_preparation" else (
+        ) or question_type in {"arrival_preparation", "credential_wording"} else (
             2 if question_type == "institution_structure" else 1
         )
         evidence = eligible[:evidence_limit]
@@ -249,6 +255,57 @@ class ExtractiveComposer:
                 "citations": citations,
                 "claims": claims,
                 "unresolved": list(dict.fromkeys(unresolved)),
+            }
+
+        if question_type == "credential_wording":
+            direct = next((
+                item for item in evidence
+                if bool((item.get("evidence_coverage") or {}).get("direct_answer"))
+            ), None)
+            official = next((
+                item for item in evidence
+                if item.get("authority_tier") in {"official_web", "official_policy", "official_guidance"}
+                and "joint_program" in set((item.get("evidence_coverage") or {}).get("covered_aspects", []))
+            ), None)
+            paragraphs: List[str] = []
+            citations: List[str] = []
+            claims: List[Dict[str, object]] = []
+            unresolved = ["暂未找到学校官网展示的证书样张，具体印刷字样仍可向招生办确认"]
+            if direct:
+                direct_id = str(direct["evidence_id"])
+                paragraphs.append(
+                    "从目前能核对到的公开问答看，中外合作办学专业的毕业证、学位证与其他专业“没有不同，"
+                    "完全一致”。按这段问答的表述，不应额外出现“中外合作办学”字样；不过该页面是第三方"
+                    f"转载的2024年招生问答，不是证书样张。 [{direct_id}]"
+                )
+                citations.append(direct_id)
+                claims.append({
+                    "text": "公开问答称中外合作办学专业毕业证、学位证与其他专业没有不同、完全一致",
+                    "evidence_ids": [direct_id],
+                    "certainty": "public",
+                })
+            else:
+                paragraphs.append(
+                    "现在还不能仅凭学校名称或“中外合作办学”相关页面判断毕业证上有没有这几个字；"
+                    "现有来源没有直接说明证书版式或印刷字样。"
+                )
+            if official:
+                official_id = str(official["evidence_id"])
+                paragraphs.append(
+                    "学校官网能够确认的是：达到相应毕业和学位条件后，授予中国传媒大学毕业证书和学士学位。"
+                    f"这能证明颁发的证书类型，但单独不能证明证书上具体印什么。 [{official_id}]"
+                )
+                citations.append(official_id)
+                claims.append({
+                    "text": "达到条件后授予中国传媒大学毕业证书和学士学位",
+                    "evidence_ids": [official_id],
+                    "certainty": "official",
+                })
+            return {
+                "answer": "\n\n".join(paragraphs),
+                "citations": citations,
+                "claims": claims,
+                "unresolved": unresolved,
             }
 
         paragraphs: List[str] = []
@@ -453,6 +510,7 @@ class OpenAICompatibleComposer:
             "不要在自然语言正文中插入 [S1]；通过 citations 和 claims.evidence_ids 返回审计引用，前端会在正文下方展示来源。"
             "学生经验要自然地说明为往届学生经验，不能说成学校规定。"
             "official_web 是学校官网实时取得的材料；public_web 是公开网络背景，只能支撑环境事实和实用建议，不能支撑学校制度。"
+            "公开网页转载的招生问答只能标为public参考，不能冒充学校官网；如果它直接回答证书样式，可以有限引用并保留核验边界。"
             "绝对不要把 public_web 支撑的建议说成学长学姐经验；只有 peer_experience 才能称为学生经验。"
             "遇到 arrival_preparation，要先分清‘学校要求带的材料’和‘结合陵水环境建议带的生活用品’，不要混成一份官方清单。"
             "回答 institution_structure 时，不得在证据没有明说的情况下推断‘二级学院’、‘与其他学院平行’或‘教学单位之一’等层级关系。"
@@ -544,6 +602,18 @@ def validate_composition(
         for term in hierarchy_terms:
             if term in visible and not any(term in str(item.get("text", "")) for item in evidence.values()):
                 errors.append(f"institution_hierarchy_inferred_without_evidence:{term}")
+    if answer_plan.get("question_type") == "credential_wording":
+        makes_wording_claim = bool(re.search(
+            r"(?:没有不同|完全一致|没有区别|不(?:会|应)[^。]{0,24}(?:中外合作办学|中外合办)[^。]{0,12}字样|"
+            r"没有[^。]{0,24}(?:中外合作办学|中外合办)[^。]{0,12}字样)",
+            visible,
+        ))
+        direct_ids = {
+            evidence_id for evidence_id, item in evidence.items()
+            if bool((item.get("evidence_coverage") or {}).get("direct_answer"))
+        }
+        if makes_wording_claim and not direct_ids.intersection(str(item) for item in citations):
+            errors.append("credential_wording_claim_without_direct_evidence")
     peer_language = any(term in visible for term in ("学长学姐", "往届学生经验", "学生经验"))
     cited_peer = any(
         evidence.get(str(citation), {}).get("authority_tier") == "peer_experience"

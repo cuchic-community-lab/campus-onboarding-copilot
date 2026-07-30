@@ -69,6 +69,10 @@ FAQ answers depend on their questions; procedure steps depend on their order.
 7. When the answer plan routes to the web, fetch only registered HTTPS hosts,
    then recompute answerability using the retrieved `official_web` and/or
    `public_web` evidence.
+8. Before adopting a passage, compare it with the question's required aspects.
+   A lexical match on a background attribute does not satisfy a missing answer
+   object. Rank direct coverage before authority, then use authority and
+   freshness to qualify the supported claim.
 
 Retrieval relevance and answer trust are separate concerns. Student-authored
 guides and measurements may rank first when they directly answer a lifestyle
@@ -96,6 +100,8 @@ and dates are often stronger than semantic similarity.
   not school policy.
 - `web_supported_mixed`: official and public live evidence jointly support
   clearly separated claims.
+- `supported_with_unresolved_wording`: a source confirms which credential is
+  awarded, but no source directly confirms its wording or appearance.
 - `insufficient_official_evidence`: the question asks for a rule or procedure
   but no official evidence is available.
 - `unverified` / `insufficient`: the system must not generate a factual answer.

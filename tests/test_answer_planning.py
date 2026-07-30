@@ -33,6 +33,12 @@ class AnswerPlanningTest(unittest.TestCase):
         self.assertEqual(plan["question_type"], "institution_structure")
         self.assertEqual(plan["fallback_route"], "official_web_discovery")
 
+    def test_credential_wording_forces_official_and_public_web_enrichment(self):
+        plan = build_answer_plan("我们的毕业证有中外合办字样吗？", "experience_only")
+        self.assertEqual(plan["question_type"], "credential_wording")
+        self.assertEqual(plan["fallback_route"], "official_and_public_web_discovery")
+        self.assertTrue(plan["requires_web_enrichment"])
+
 
 if __name__ == "__main__":
     unittest.main()

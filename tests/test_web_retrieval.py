@@ -45,6 +45,32 @@ class WebRetrievalTest(unittest.TestCase):
         self.assertEqual(result["status"], "no_registered_source")
         self.assertEqual(result["results"], [])
 
+    def test_verified_snapshot_preserves_http_boundary_without_live_fetch(self):
+        registry = [{
+            "source_id": "legacy-faq",
+            "title": "公开转载问答",
+            "url": "http://legacy.example.test/faq",
+            "route": "public",
+            "authority_tier": "public_web",
+            "assertion_policy": "cite_as_public_reference",
+            "published_at": "2024-06-26",
+            "date_status": "verified_snapshot",
+            "query_terms": ["毕业证"],
+            "focus_terms": ["完全一致"],
+            "verified_excerpt": "中外合作办学专业毕业证和其他专业一样吗？答：没有不同，与其他专业完全一致。",
+            "verified_at": "2026-07-30T16:45:00+0800",
+            "uncertainty": ["第三方转载"],
+        }]
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "sources.json"
+            path.write_text(json.dumps(registry, ensure_ascii=False), encoding="utf-8")
+            retriever = CuratedLiveWebRetriever(path)
+            retriever._fetch = lambda url: (_ for _ in ()).throw(AssertionError("must not fetch HTTP"))
+            result = retriever.search("毕业证有中外合办字样吗？", ["public"])
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(result["results"][0]["retrieval_origin"], "verified_web_snapshot")
+        self.assertIn("完全一致", result["results"][0]["text"])
+
 
 if __name__ == "__main__":
     unittest.main()

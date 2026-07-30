@@ -234,7 +234,13 @@ class CuratedLiveWebRetriever:
         return "\n".join(output)
 
     def _fetch_source(self, source: Dict[str, object], query: str) -> Dict[str, object]:
-        page_text, fetched_at = self._fetch(str(source["url"]))
+        if source.get("verified_excerpt"):
+            page_text = str(source["verified_excerpt"])
+            fetched_at = str(source.get("verified_at") or "")
+            retrieval_origin = "verified_web_snapshot"
+        else:
+            page_text, fetched_at = self._fetch(str(source["url"]))
+            retrieval_origin = "live_web"
         excerpt = self._excerpt(page_text, query, source.get("focus_terms", []))
         if not excerpt:
             raise ValueError("empty_web_excerpt")
@@ -244,9 +250,12 @@ class CuratedLiveWebRetriever:
             "title": str(source["title"]),
             "text": excerpt,
             "chunk_type": "web_excerpt",
-            "heading_path": "官网实时检索" if source["route"] == "official" else "公开网络实时检索",
+            "heading_path": (
+                "已核验公开网页快照" if retrieval_origin == "verified_web_snapshot"
+                else ("官网实时检索" if source["route"] == "official" else "公开网络实时检索")
+            ),
             "page_number": None,
-            "tags": ["live_web", str(source["route"])],
+            "tags": [retrieval_origin, str(source["route"])],
             "authority_tier": str(source["authority_tier"]),
             "assertion_policy": str(source["assertion_policy"]),
             "source_url": str(source["url"]),
@@ -260,7 +269,7 @@ class CuratedLiveWebRetriever:
             "effective_from": None,
             "date_status": str(source["date_status"]),
             "uncertainty": list(source.get("uncertainty", [])),
-            "retrieval_origin": "live_web",
+            "retrieval_origin": retrieval_origin,
             "web_source_kind": str(source["route"]),
             "fetched_at": fetched_at,
             "score": float(source.get("match_score", 0.0)),
