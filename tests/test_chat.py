@@ -36,6 +36,29 @@ class FakeRetriever:
 
 
 class ChatTest(unittest.TestCase):
+    def test_insufficient_evidence_bypasses_model_composer(self):
+        retriever = FakeRetriever()
+
+        def insufficient_search(query, top_k, profile):
+            result = FakeRetriever().search(query, top_k, profile)
+            result["answerability"] = "insufficient"
+            return result
+
+        retriever.search = insufficient_search
+
+        class MustNotRunComposer:
+            name = "must_not_run"
+
+            def generate(self, context):
+                raise AssertionError("model must not run without answerable evidence")
+
+        result = GroundedChatService(retriever, composer=MustNotRunComposer()).ask(
+            "智能科学与技术的就业方向有哪些？"
+        )
+        self.assertEqual(result["composer"], "extractive_fallback")
+        self.assertEqual(result["answer_plan"]["fallback_route"], "public_web_discovery")
+        self.assertEqual(result["citations"], [])
+
     def test_follow_up_uses_prior_user_question_for_retrieval(self):
         retriever = FakeRetriever()
         service = GroundedChatService(
@@ -50,6 +73,8 @@ class ChatTest(unittest.TestCase):
         self.assertEqual(second["conversation_turns"], 2)
         self.assertIn("宿舍是几人间", second["retrieval_query"])
         self.assertIn("那研究生呢", retriever.queries[-1])
+        self.assertNotIn("[S1]", first["display_answer"])
+        self.assertEqual([item["evidence_id"] for item in first["sources"]], ["S1"])
 
     def test_reset_removes_context(self):
         retriever = FakeRetriever()

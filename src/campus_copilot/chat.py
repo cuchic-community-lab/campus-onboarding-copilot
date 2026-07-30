@@ -4,7 +4,13 @@ import uuid
 from collections import OrderedDict
 from typing import Dict, List, Optional, Tuple
 
-from .composition import AnswerComposer, ExtractiveComposer, configured_composer, validate_composition
+from .composition import (
+    AnswerComposer,
+    ExtractiveComposer,
+    configured_composer,
+    display_answer,
+    validate_composition,
+)
 from .context_builder import build_context_packet
 
 
@@ -103,25 +109,35 @@ class GroundedChatService:
 
         warning: Optional[str] = None
         composer_used = self.composer.name
-        try:
-            composition = self.composer.generate(context)
-            valid, errors = validate_composition(composition, context)
-            if not valid:
-                warning = "model_output_failed_grounding_validation:" + ",".join(errors)
-                composition = self.fallback.generate(context)
-                composer_used = self.fallback.name
-        except Exception:
-            warning = "model_provider_unavailable_fallback_used"
+        if not context.get("can_generate"):
             composition = self.fallback.generate(context)
             composer_used = self.fallback.name
+        else:
+            try:
+                composition = self.composer.generate(context)
+                valid, errors = validate_composition(composition, context)
+                if not valid:
+                    warning = "model_output_failed_grounding_validation:" + ",".join(errors)
+                    composition = self.fallback.generate(context)
+                    composer_used = self.fallback.name
+            except Exception:
+                warning = "model_provider_unavailable_fallback_used"
+                composition = self.fallback.generate(context)
+                composer_used = self.fallback.name
 
         citations = [str(item) for item in composition.get("citations", [])]
         self.sessions.append(session_id, query, str(composition["answer"]), citations)
+        cited = set(citations)
+        sources = [
+            item for item in context["evidence"]
+            if str(item.get("evidence_id")) in cited
+        ]
         return {
             "session_id": session_id,
             "query": query,
             "retrieval_query": retrieval_query,
             "answer": composition["answer"],
+            "display_answer": display_answer(str(composition["answer"])),
             "citations": citations,
             "claims": composition.get("claims", []),
             "unresolved": composition.get("unresolved", []),
@@ -129,6 +145,8 @@ class GroundedChatService:
             "composer": composer_used,
             "composer_warning": warning,
             "evidence": context["evidence"],
+            "sources": sources,
+            "answer_plan": context["answer_plan"],
             "conversation_turns": len(history) // 2 + 1,
         }
 

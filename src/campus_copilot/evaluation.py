@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 from typing import Dict, List
 
@@ -57,12 +58,12 @@ def evaluate_chat(path: Path = DEFAULT_GOLDEN_SET) -> Dict[str, object]:
                 cases.append(json.loads(line))
     service = GroundedChatService(HybridRetriever(DB_PATH))
     details: List[Dict[str, object]] = []
-    citation_hits = refusal_hits = experience_hits = 0
+    citation_hits = refusal_hits = experience_hits = direct_answer_hits = 0
     for case in cases:
         result = service.ask(str(case["query"]), profile=case.get("profile") or {}, top_k=5)
         evidence_ids = {str(item["evidence_id"]) for item in result["evidence"]}
         citations = result["citations"]
-        citation_ok = all(item in evidence_ids and f"[{item}]" in result["answer"] for item in citations)
+        citation_ok = all(item in evidence_ids for item in citations)
         citation_ok = citation_ok and (bool(citations) or result["answerability"].startswith("insufficient"))
         refusal_expected = result["answerability"].startswith("insufficient") or result["answerability"] == "unverified"
         refusal_ok = (not result["claims"] and not citations) if refusal_expected else True
@@ -72,17 +73,24 @@ def evaluate_chat(path: Path = DEFAULT_GOLDEN_SET) -> Dict[str, object]:
             if any(authority_by_id.get(evidence_id) == "peer_experience" for evidence_id in claim.get("evidence_ids", []))
         ]
         experience_ok = not peer_claims or (
-            "学生经验" in result["answer"]
+            any(label in result["answer"] for label in ("学生经验", "往届学生", "学生整理的往届信息"))
             and all(claim.get("certainty") == "experience" for claim in peer_claims)
         )
+        visible_answer = str(result.get("display_answer") or result["answer"])
+        direct_answer_ok = not bool(re.match(
+            r"^(?:现有学校材料|学生经验（|《|根据《|[^。]{0,40}(?:文件|通知)》?提到)",
+            visible_answer,
+        ))
         citation_hits += int(citation_ok)
         refusal_hits += int(refusal_ok)
         experience_hits += int(experience_ok)
+        direct_answer_hits += int(direct_answer_ok)
         details.append({
             "id": case["id"],
             "citation_contract_ok": citation_ok,
             "refusal_contract_ok": refusal_ok,
             "peer_label_ok": experience_ok,
+            "direct_answer_ok": direct_answer_ok,
             "answerability": result["answerability"],
             "composer": result["composer"],
         })
@@ -93,7 +101,10 @@ def evaluate_chat(path: Path = DEFAULT_GOLDEN_SET) -> Dict[str, object]:
         "citation_contract_accuracy": round(citation_hits / total, 3),
         "refusal_contract_accuracy": round(refusal_hits / total, 3),
         "peer_label_accuracy": round(experience_hits / total, 3),
-        "all_contracts_passed": citation_hits == refusal_hits == experience_hits == len(cases),
-        "limitation": "This checks grounding contracts, not human-rated factual completeness or answer usefulness.",
+        "direct_answer_accuracy": round(direct_answer_hits / total, 3),
+        "all_contracts_passed": (
+            citation_hits == refusal_hits == experience_hits == direct_answer_hits == len(cases)
+        ),
+        "limitation": "This checks grounding and basic response shape; human-rated usefulness still requires labeled review.",
         "details": details,
     }

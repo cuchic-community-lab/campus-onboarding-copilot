@@ -7,6 +7,7 @@ judge. `/api/context` is the integration boundary.
 
 ```text
 user question + student profile
+  → question-type and answer-shape planning
   → retrieval + applicability filters
   → source policy + answerability decision
   → versioned context packet
@@ -25,7 +26,12 @@ be asked to search the database itself.
   "query": "宿舍是几人间？",
   "can_generate": true,
   "response_mode": "experience_only",
-  "model_contract_version": "campus-grounding-v1",
+  "model_contract_version": "campus-grounding-v3-student-ambassador",
+  "answer_plan": {
+    "question_type": "campus_experience",
+    "fallback_route": "local_knowledge",
+    "response_shape": "direct_answer_then_context_then_sources"
+  },
   "system_rules": ["..."],
   "evidence": [
     {
@@ -87,11 +93,34 @@ Before returning an answer:
 5. dates and student applicability must match the evidence;
 6. `can_generate=false` permits only a refusal plus a request for the missing
    source.
+7. a generated answer may not open as a document citation frame or policy-file
+   recital.
 
 The current validator implements citation existence, inline citation presence,
 claim-to-evidence linkage, official-source requirements, peer-experience
 labeling, and refusal compliance. Full natural-language entailment checking is
 not yet implemented and must not be implied by the current validator.
+
+The API audits grounding through the structured `citations` list and each
+claim's `evidence_ids`; inline tokens are not required in student-facing prose.
+`display_answer` also strips tokens produced by older models or the local
+fallback. The UI renders only `sources` whose IDs were cited; other retrieval
+candidates remain available in the API for debugging but are not presented as
+answer support.
+
+## Discovery routing boundary
+
+The planner distinguishes three evidence paths:
+
+1. `local_knowledge`: answer from the indexed corpus.
+2. `official_web_discovery`: search only university, school, and verified
+   official-account sources for current school-specific facts.
+3. `public_web_discovery`: search reputable public sources for general topics,
+   while keeping them separate from school-specific claims.
+
+Only the first path is executed today. The latter two are explicit, tested
+handoff states so a future search adapter cannot silently broaden the trust
+boundary or use model memory as a substitute for retrieval.
 
 ## Conversation boundary
 

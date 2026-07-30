@@ -10,6 +10,7 @@ from typing import Dict, Iterable, List, Optional, Tuple
 
 from .db import chinese_search_terms, connect
 from .source_policy import AUTHORITY_CONFIDENCE
+from .answer_planning import classify_question
 
 
 SYNONYMS = {
@@ -191,6 +192,9 @@ class HybridRetriever:
         query_concepts = _query_concepts(query)
         requested_entities = _requested_domain_entities(query)
         availability_query = any(term in query for term in ("有吗", "有没有", "机会", "是否"))
+        historical_outcome_query = any(
+            term in query for term in ("多少人", "多少名", "百分之", "比例", "排到多少", "大概")
+        )
         procedure_query = any(term in query for term in ("怎么", "如何", "操作", "步骤"))
         rule_query = any(term in query for term in ("规定", "最低", "必须", "退课", "学分"))
         dimension_query = any(term in query.lower() for term in DIMENSION_QUERY_TERMS)
@@ -281,6 +285,16 @@ class HybridRetriever:
                 # Availability questions benefit from a direct observed outcome
                 # alongside policy documents that only establish a mechanism.
                 task_multiplier *= 1.45
+            if (
+                historical_outcome_query
+                and domain_entity_match
+                and row["chunk_type"] == "faq"
+                and re.search(r"(?:\d+\s*人|\d+(?:\.\d+)?%|比例)", row["text"] or "")
+            ):
+                # A question about observed cohort outcomes should prefer an
+                # observed cohort answer over a policy document containing
+                # unrelated scoring formulas.
+                task_multiplier *= 1.7
             applicability = 1.0
             if profile.get("cohort") and row["cohort"] and profile["cohort"] != row["cohort"]:
                 applicability *= 0.75
@@ -349,7 +363,18 @@ class HybridRetriever:
             for item in results[:3]
         )
         uncertain = any(item["uncertainty"] for item in results[:3])
-        if not results:
+        question_type = classify_question(query)
+        general_guidance_supported = any(
+            any(term in " ".join([
+                str(item.get("title", "")),
+                str(item.get("heading_path", "")),
+                str(item.get("text", "")),
+            ]) for term in ("就业方向", "职业方向", "就业领域", "就业岗位", "从事", "毕业去向"))
+            for item in results[:3]
+        )
+        if question_type == "general_guidance" and not general_guidance_supported:
+            status = "insufficient"
+        elif not results:
             status = "insufficient"
         elif intent == "policy_or_procedure" and not has_official:
             status = "insufficient_official_evidence"

@@ -1,4 +1,6 @@
 PYTHON ?= $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
+HOST ?= 127.0.0.1
+PORT ?= 8000
 -include .env.local
 export
 
@@ -17,7 +19,7 @@ chat:
 	PYTHONPATH=src $(PYTHON) -m campus_copilot.cli chat "$(Q)"
 
 serve:
-	PYTHONPATH=src $(PYTHON) -m campus_copilot.cli serve
+	PYTHONPATH=src $(PYTHON) -m campus_copilot.cli serve --host $(HOST) --port $(PORT)
 
 makers-check:
 	@test "$(CAMPUS_LLM_PROVIDER)" = "makers" || (echo "Set CAMPUS_LLM_PROVIDER=makers in .env.local" && exit 1)

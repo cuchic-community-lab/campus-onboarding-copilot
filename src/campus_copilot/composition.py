@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from typing import Dict, List, Optional, Protocol, Tuple
 from urllib import request
 
+from .answer_planning import fallback_message
+
 
 PROVIDER_PRESETS = {
     "makers": {
@@ -67,6 +69,38 @@ def _excerpt(text: str, limit: int = 300) -> str:
     return (shortened[:boundary + 1] if boundary > limit // 2 else shortened.rstrip()) + "…"
 
 
+def display_answer(answer: str) -> str:
+    """Remove audit citation tokens from the student-facing prose."""
+    return re.sub(r"\s*\[S\d+\]", "", answer).strip()
+
+
+def _focused_excerpt(text: str, query: str, question_type: str) -> str:
+    if "保研" in query or "推免" in query:
+        cohort = re.search(
+            r"(\d{2})级(?:毕业生)?(?:共)?\s*(\d+)\s*人(?:中)?保研\s*(\d+)\s*人",
+            text,
+        )
+        if not cohort:
+            cohort = re.search(
+                r"(\d{2})级(?:毕业生)?(?:共)?\s*(\d+)\s*人中\s*(\d+)\s*人保研",
+                text,
+            )
+        if cohort:
+            year, total_text, admitted_text = cohort.groups()
+            total, admitted = int(total_text), int(admitted_text)
+            ratio = admitted / total * 100 if total else 0
+            return f"{year}级毕业生{total}人中有{admitted}人保研，约占{ratio:.1f}%"
+    if question_type == "historical_outcome":
+        sentences = re.split(r"[。\n]+", text)
+        focused = [
+            sentence.strip() for sentence in sentences
+            if re.search(r"(?:\d+\s*人|\d+(?:\.\d+)?%|比例|保研|推免)", sentence)
+        ]
+        if focused:
+            return _excerpt("。".join(focused[:2]) + "。", 220)
+    return _excerpt(text)
+
+
 class ExtractiveComposer:
     """Auditable no-key fallback; it summarizes only retrieved passages."""
 
@@ -74,11 +108,12 @@ class ExtractiveComposer:
 
     def generate(self, context_packet: Dict[str, object]) -> Dict[str, object]:
         if not context_packet.get("can_generate"):
+            route = str((context_packet.get("answer_plan") or {}).get("fallback_route", ""))
             if context_packet.get("response_mode") == "insufficient_contextual_evidence":
                 answer = "我没有找到既符合当前追问对象、又能直接回答上一问题的材料，因此不能把其他相似内容当成答案。请补充对应人群的资料或向学校确认。"
                 unresolved = ["缺少同时匹配原问题主题和当前追问对象的证据"]
             else:
-                answer = "目前知识库中没有足够的可核实材料来回答这个问题。请以学校最新通知或向对应部门确认为准。"
+                answer = fallback_message(route)
                 unresolved = ["缺少能够支持结论的有效来源"]
             return {
                 "answer": answer,
@@ -105,25 +140,40 @@ class ExtractiveComposer:
         citations: List[str] = []
         claims: List[Dict[str, object]] = []
         unresolved: List[str] = []
-        for item in evidence:
+        question_type = str((context_packet.get("answer_plan") or {}).get("question_type", "campus_fact"))
+        query = str(context_packet.get("query", ""))
+        for index, item in enumerate(evidence):
             evidence_id = str(item["evidence_id"])
             authority = str(item.get("authority_tier", "unverified"))
             if authority == "peer_experience":
-                prefix = "学生经验（不是学校官方规定）"
+                prefix = "根据学生整理的往届信息，"
                 certainty = "experience"
             elif authority in {"official_policy", "official_guidance"}:
-                prefix = "现有学校材料"
+                prefix = "根据现有学校材料，"
                 certainty = "official"
             else:
-                prefix = "待核实资料"
+                prefix = "现有待核实资料显示，"
                 certainty = "unverified"
-            text = _excerpt(str(item.get("text", "")))
-            paragraph = f"{prefix}《{item.get('title', '未命名来源')}》提到：{text} [{evidence_id}]"
+            text = _focused_excerpt(
+                str(item.get("text", "")), query, question_type
+            )
+            lead = ""
+            if index == 0 and any(term in query for term in ("有吗", "有没有", "机会吗")):
+                lead = "有的。"
+            paragraph = f"{lead}{prefix}{text} [{evidence_id}]"
+            if authority == "peer_experience" and question_type == "historical_outcome":
+                paragraph += " 这是往届实际结果，不代表每一届都有固定比例或固定名额。"
+                if "排到" in query or "排名" in query:
+                    paragraph += " 现有材料没有给出最低排名，不能据此判断排到第几名就一定可以。"
+                    unresolved.append("缺少当届具体名额和最低入选排名")
             paragraphs.append(paragraph)
             citations.append(evidence_id)
             claims.append({"text": text, "evidence_ids": [evidence_id], "certainty": certainty})
             if item.get("date_status") != "verified" and not item.get("effective_from"):
-                unresolved.append(f"{item.get('title', '该资料')}的生效时间尚未核实")
+                if authority == "peer_experience":
+                    unresolved.append(f"{item.get('title', '该学生资料')}的对应届次尚未完整标明")
+                else:
+                    unresolved.append(f"{item.get('title', '该资料')}的生效时间尚未核实")
 
         if context_packet.get("response_mode") == "experience_only":
             unresolved.append("当前结论主要来自往届学生经验，具体安排可能随届次变化")
@@ -160,6 +210,28 @@ def _normalize_model_response(value: Dict[str, object]) -> Dict[str, object]:
         normalized["unresolved"] = []
     elif isinstance(unresolved, str):
         normalized["unresolved"] = [unresolved] if unresolved.strip() else []
+    citations = normalized.get("citations")
+    if isinstance(citations, list):
+        normalized["citations"] = [
+            match.group(1) if (match := re.fullmatch(r"\[?(S\d+)\]?", str(item).strip())) else item
+            for item in citations
+        ]
+    claims = normalized.get("claims")
+    if isinstance(claims, list):
+        normalized_claims: List[object] = []
+        for claim in claims:
+            if not isinstance(claim, dict):
+                normalized_claims.append(claim)
+                continue
+            normalized_claim = dict(claim)
+            evidence_ids = normalized_claim.get("evidence_ids")
+            if isinstance(evidence_ids, list):
+                normalized_claim["evidence_ids"] = [
+                    match.group(1) if (match := re.fullmatch(r"\[?(S\d+)\]?", str(item).strip())) else item
+                    for item in evidence_ids
+                ]
+            normalized_claims.append(normalized_claim)
+        normalized["claims"] = normalized_claims
     return normalized
 
 
@@ -173,16 +245,24 @@ class OpenAICompatibleComposer:
 
     def generate(self, context_packet: Dict[str, object]) -> Dict[str, object]:
         system = (
-            "你是新生入学助手。你只能依据提供的 evidence 回答，不能使用模型记忆补充事实。"
-            "每个事实段落必须包含形如 [S1] 的引用。学生经验必须明确写成学生经验，不能说成学校规定。"
-            "保留原文中的不确定性和时间边界。can_generate 为 false 时只能拒答并说明缺少什么。"
+            "你是一位可靠、耐心、熟悉校园生活的学生大使，不是政策文件朗读器。"
+            "使用自然、克制的中文口语，像学长学姐帮助新生；不要自称AI，不要过度使用‘嗯嗯’等语气词。"
+            "第一句直接回答学生真正的问题，随后只补充最有帮助的背景，全文通常不超过三段。"
+            "不要以文件名、文号、‘现有学校材料提到’或大段政策原文开头，也不要逐条复述法律条款。"
+            "你只能依据提供的 evidence 回答事实，不能使用模型记忆补充事实。"
+            "不要在自然语言正文中插入 [S1]；通过 citations 和 claims.evidence_ids 返回审计引用，前端会在正文下方展示来源。"
+            "学生经验要自然地说明为往届学生经验，不能说成学校规定。"
+            "往届人数或比例不能表达成每届固定名额；政策存在也不能推导出某个班的具体名额。"
+            "如果 evidence 没有最低排名，绝对不能把往届比例反推成‘班级前多少名/百分之多少就能保研’。"
+            "保留必要的时间边界，但不要反复使用免责声明。can_generate 为 false 时只能说明缺少什么和下一步去哪类来源查。"
+            "严格遵循 answer_plan 中的 question_type、guidance 和 response_shape。"
             "仅输出 JSON 对象，字段必须为 answer、citations、claims、unresolved。"
             "claims 中每项必须包含 text、evidence_ids、certainty；certainty 只能是 official、experience、unverified。"
         )
         user = json.dumps(context_packet, ensure_ascii=False, separators=(",", ":"))
         payload = json.dumps({
             "model": self.config.model,
-            "temperature": 0.1,
+            "temperature": 0.25,
             "response_format": {"type": "json_object"},
             "messages": [
                 {"role": "system", "content": system},
@@ -216,6 +296,11 @@ def validate_composition(
     unresolved = composition.get("unresolved")
     if not isinstance(answer, str) or not answer.strip():
         errors.append("answer_required")
+    elif context_packet.get("can_generate") and re.match(
+        r"^(?:现有学校材料|学生经验（|《|根据《|[^。]{0,40}(?:文件|通知)》?提到)",
+        display_answer(answer),
+    ):
+        errors.append("answer_starts_with_document_frame")
     if not isinstance(citations, list) or not all(isinstance(item, str) for item in citations):
         errors.append("citations_must_be_string_list")
         citations = []
@@ -226,11 +311,22 @@ def validate_composition(
         errors.append("unresolved_must_be_list")
 
     evidence = {str(item["evidence_id"]): item for item in context_packet.get("evidence", [])}
+    answer_plan = context_packet.get("answer_plan") or {}
+    if answer_plan.get("question_type") == "historical_outcome":
+        evidence_has_rank = any(
+            any(term in str(item.get("text", "")) for term in ("最低排名", "排名前", "班级前", "排到第"))
+            for item in evidence.values()
+        )
+        visible = display_answer(str(answer or ""))
+        inferred_rank = bool(re.search(
+            r"(?:(?:名额|排名|班级前)[^。]{0,24}\d+(?:\.\d+)?%|排到第\s*\d+)",
+            visible,
+        ))
+        if inferred_rank and not evidence_has_rank:
+            errors.append("historical_outcome_inferred_rank_without_evidence")
     for citation in citations:
         if citation not in evidence:
             errors.append(f"unknown_citation:{citation}")
-        elif f"[{citation}]" not in str(answer):
-            errors.append(f"citation_missing_from_answer:{citation}")
 
     if context_packet.get("can_generate") and evidence and not citations:
         errors.append("grounded_answer_requires_citation")

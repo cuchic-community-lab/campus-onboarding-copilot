@@ -7,6 +7,7 @@ from campus_copilot.composition import (
     ProviderConfig,
     _normalize_model_response,
     configured_composer,
+    display_answer,
     validate_composition,
 )
 
@@ -42,6 +43,17 @@ class CompositionTest(unittest.TestCase):
         self.assertEqual(normalized["unresolved"], ["研究生是否适用仍未知"])
         self.assertEqual(normalized["claims"], value["claims"])
 
+    def test_bracketed_structured_evidence_ids_are_normalized(self):
+        value = {
+            "answer": "往届85人中有14人保研。",
+            "citations": ["[S1]"],
+            "claims": [{"text": "14人保研", "evidence_ids": ["[S1]"], "certainty": "experience"}],
+            "unresolved": [],
+        }
+        normalized = _normalize_model_response(value)
+        self.assertEqual(normalized["citations"], ["S1"])
+        self.assertEqual(normalized["claims"][0]["evidence_ids"], ["S1"])
+
     def test_makers_preset_selects_gateway_and_default_model(self):
         with patch.dict(
             "os.environ",
@@ -69,9 +81,55 @@ class CompositionTest(unittest.TestCase):
         result = ExtractiveComposer().generate(context)
         valid, errors = validate_composition(result, context)
         self.assertTrue(valid, errors)
-        self.assertIn("学生经验（不是学校官方规定）", result["answer"])
+        self.assertIn("根据学生整理的往届信息", result["answer"])
+        self.assertNotIn("《宿舍问答》提到", result["answer"])
         self.assertIn("[S1]", result["answer"])
         self.assertEqual(result["claims"][0]["certainty"], "experience")
+
+    def test_display_answer_moves_audit_citation_out_of_prose(self):
+        self.assertEqual(display_answer("有的。往届有14人保研。[S1]"), "有的。往届有14人保研。")
+
+    def test_validator_rejects_document_reader_opening(self):
+        context = packet(authority="official_policy")
+        invalid = {
+            "answer": "现有学校材料《中国传媒大学办法》提到：可以申请。[S1]",
+            "citations": ["S1"],
+            "claims": [{"text": "可以申请", "evidence_ids": ["S1"], "certainty": "official"}],
+            "unresolved": [],
+        }
+        valid, errors = validate_composition(invalid, context)
+        self.assertFalse(valid)
+        self.assertIn("answer_starts_with_document_frame", errors)
+
+    def test_historical_outcome_is_not_called_a_fixed_quota(self):
+        context = packet()
+        context["query"] = "班上大概排到多少名可以保研？"
+        context["answer_plan"] = {"question_type": "historical_outcome"}
+        context["evidence"][0]["text"] = "回答：22级85人中14人保研，比例约17%。"
+        result = ExtractiveComposer().generate(context)
+        self.assertIn("85人中有14人保研，约占16.5%", result["answer"])
+        self.assertNotIn("保研固定比例17%", result["answer"])
+        self.assertIn("不代表每一届都有固定比例或固定名额", result["answer"])
+        self.assertIn("不能据此判断排到第几名就一定可以", result["answer"])
+
+    def test_validator_rejects_rank_inferred_from_historical_ratio(self):
+        context = packet()
+        context["query"] = "班上大概排到多少名可以保研？"
+        context["answer_plan"] = {"question_type": "historical_outcome"}
+        context["evidence"][0]["text"] = "22级毕业生共85人保研14人。"
+        invalid = {
+            "answer": "往届大约班级前15%-17%可以保研。",
+            "citations": ["S1"],
+            "claims": [{
+                "text": "班级前15%-17%可以保研",
+                "evidence_ids": ["S1"],
+                "certainty": "experience",
+            }],
+            "unresolved": [],
+        }
+        valid, errors = validate_composition(invalid, context)
+        self.assertFalse(valid)
+        self.assertIn("historical_outcome_inferred_rank_without_evidence", errors)
 
     def test_validator_rejects_peer_claim_presented_as_official(self):
         context = packet()

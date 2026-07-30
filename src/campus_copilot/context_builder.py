@@ -1,5 +1,7 @@
 from typing import Dict, List, Optional
 
+from .answer_planning import build_answer_plan
+
 
 SYSTEM_RULES = [
     "Only use supplied evidence; do not rely on model memory.",
@@ -50,6 +52,7 @@ def build_context_packet(
         "response_mode": status,
         "insufficient_reason": retrieval.get("insufficient_reason"),
         "system_rules": SYSTEM_RULES,
+        "answer_plan": build_answer_plan(str(retrieval.get("query", "")), status),
         "evidence": evidence,
-        "model_contract_version": "campus-grounding-v2",
+        "model_contract_version": "campus-grounding-v3-student-ambassador",
     }

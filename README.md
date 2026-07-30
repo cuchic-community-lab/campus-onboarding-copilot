@@ -24,6 +24,13 @@ incomplete. A configurable model may compose the final answer, but it never
 becomes the source of truth. Without a model credential, an auditable local
 composer keeps the complete product path runnable.
 
+The answer layer follows a student-ambassador contract: identify whether the
+student needs an observed cohort outcome, a current rule, campus experience, or
+general career guidance; answer the actual question first; keep audit citation
+tokens out of the visible prose; and show only the sources actually used below
+the answer. A historical outcome such as `14 of 85 students` is never silently
+promoted into a permanent official quota.
+
 ## Why this is an indexed knowledge base
 
 The durable layer is SQLite, not a vector database:
@@ -114,7 +121,15 @@ curl -s http://127.0.0.1:8000/api/search \
 
 `/api/chat` adds a bounded in-memory conversation (the most recent four turns),
 uses prior user intent to resolve explicit follow-ups, retrieves fresh evidence
-for every turn, and returns an answer with inspectable source objects.
+for every turn, and returns both an audit answer and a citation-free
+`display_answer`, plus only the cited `sources` for student-facing rendering.
+
+When local evidence is insufficient, the answer plan records one of two future
+discovery routes instead of using model memory: `official_web_discovery` for
+school-specific/current questions, or `public_web_discovery` for general topics
+such as career directions. This version exposes and tests the routing decision;
+it does not yet execute a web search. The intended official allowlist is the
+university, school, and verified official WeChat sources.
 
 `/api/context` returns the same model-ready evidence packet and response policy.
 A provider receives only this packet and must:
@@ -168,9 +183,10 @@ truth. The MVP excludes QR communities and flags record-style spreadsheets as
 potentially sensitive. It also distinguishes `uploadTime` from publication and
 effective dates.
 
-`evaluate-chat` is a contract check, not a claim that answer quality is solved.
-Human-labeled completeness, usefulness, temporal conflicts, and held-out
-questions remain required before reporting a production accuracy metric.
+`evaluate-chat` checks grounding plus a basic direct-answer shape; it is not a
+claim that answer quality is solved. Human-labeled completeness, usefulness,
+temporal conflicts, tone, and held-out questions remain required before
+reporting a production accuracy metric.
 
 ## Contributing and release status
 
