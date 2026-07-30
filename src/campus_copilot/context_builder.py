@@ -62,6 +62,9 @@ def build_context_packet(
         "web_search_provider": web_search.get("provider"),
         "web_search_status": web_search.get("status"),
         "web_search_routes": web_search.get("routes", []),
+        "web_discovery_executed": bool((web_search.get("discovery") or {}).get("executed")),
+        "web_discovery_provider": (web_search.get("discovery") or {}).get("provider"),
+        "web_discovery_status": (web_search.get("discovery") or {}).get("status"),
     })
     return {
         "query": retrieval.get("query"),

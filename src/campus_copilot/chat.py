@@ -110,7 +110,7 @@ class GroundedChatService:
         if not web_results and question_type != "credential_wording":
             return enriched
 
-        if question_type in {"arrival_preparation", "institution_structure"}:
+        if question_type in {"arrival_preparation", "institution_structure", "general_guidance"}:
             # These are explicitly web-governed intents. Weak local passages
             # must not become evidence merely because they share campus words.
             merged_results = web_results

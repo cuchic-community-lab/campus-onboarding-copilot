@@ -73,6 +73,10 @@ FAQ answers depend on their questions; procedure steps depend on their order.
    A lexical match on a background attribute does not satisfy a missing answer
    object. Rank direct coverage before authority, then use authority and
    freshness to qualify the supported claim.
+9. When a search provider is configured, execute discovery for planned web
+   routes, deduplicate discovered URLs with registry results, and apply the same
+   evidence contract. Missing credentials produce registry-only behavior rather
+   than a false claim that open-web search ran.
 
 Retrieval relevance and answer trust are separate concerns. Student-authored
 guides and measurements may rank first when they directly answer a lifestyle

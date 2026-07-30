@@ -12,6 +12,11 @@ from urllib.error import URLError
 from urllib.parse import urlparse
 
 from .config import PROJECT_ROOT, USER_AGENT
+from .search_discovery import (
+    NullSearchDiscovery,
+    SearchDiscoveryProvider,
+    configured_search_discovery,
+)
 
 
 SOURCE_REGISTRY_PATH = PROJECT_ROOT / "config" / "web_sources.json"
@@ -107,6 +112,7 @@ class CuratedLiveWebRetriever:
         registry_path: Path = SOURCE_REGISTRY_PATH,
         timeout_seconds: float = 10.0,
         cache_ttl_seconds: float = 1800.0,
+        discovery_provider: Optional[SearchDiscoveryProvider] = None,
     ) -> None:
         self.registry_path = registry_path
         self.timeout_seconds = timeout_seconds
@@ -118,6 +124,7 @@ class CuratedLiveWebRetriever:
         }
         self._cache: Dict[str, _CachedPage] = {}
         self._lock = threading.Lock()
+        self.discovery_provider = discovery_provider or NullSearchDiscovery()
 
     @staticmethod
     def _matches(query: str, terms: Iterable[str]) -> float:
@@ -300,6 +307,17 @@ class CuratedLiveWebRetriever:
                 results.append(self._fetch_source(source, query))
             except Exception as exc:
                 errors.append(f"{source['source_id']}:{type(exc).__name__}")
+        discovery = self.discovery_provider.search(query, requested_routes, top_k)
+        errors.extend(
+            f"discovery:{error}" for error in discovery.get("errors", [])
+        )
+        seen_urls = {str(item.get("source_url", "")) for item in results}
+        for item in discovery.get("results", []):
+            url = str(item.get("source_url", ""))
+            if not url or url in seen_urls:
+                continue
+            seen_urls.add(url)
+            results.append(item)
         results.sort(
             key=lambda item: (
                 1 if item.get("web_source_kind") == "official" else 0,
@@ -307,24 +325,28 @@ class CuratedLiveWebRetriever:
             ),
             reverse=True,
         )
+        attempted = bool(candidates) or bool(discovery.get("executed"))
         return {
-            "executed": bool(candidates),
+            "executed": bool(candidates) or bool(discovery.get("executed")),
             "provider": self.name,
-            "status": "success" if results else ("failed" if candidates else "no_registered_source"),
+            "status": "success" if results else ("failed" if attempted else "no_registered_source"),
             "routes": requested_routes,
-            "results": results,
+            "results": results[:top_k],
             "errors": errors,
+            "discovery": {key: value for key, value in discovery.items() if key != "results"},
         }
 
     def status(self) -> Dict[str, object]:
+        discovery_status = self.discovery_provider.status()
         return {
-            "mode": "live",
+            "mode": "registry_plus_discovery" if discovery_status.get("mode") == "live_discovery" else "registry_only",
             "provider": self.name,
             "registered_sources": len(self.sources),
             "allowed_hosts": sorted(self.allowed_hosts),
             "cache_ttl_seconds": self.cache_ttl_seconds,
+            "discovery": discovery_status,
         }
 
 
 def configured_web_retriever() -> WebRetriever:
-    return CuratedLiveWebRetriever()
+    return CuratedLiveWebRetriever(discovery_provider=configured_search_discovery())

@@ -131,12 +131,14 @@ The planner distinguishes four evidence paths:
    a distinct public context source, for example a historical arrival checklist
    plus Lingshui climate information.
 
-All four paths can execute today for sources registered in
+All four paths can execute against sources registered in
 `config/web_sources.json`. The live adapter performs allowlisted HTML/PDF
-fetching; it is intentionally a curated retrieval layer rather than a general
-search engine. Arbitrary web and WeChat discovery remains a future adapter and
-must not silently broaden the trust boundary or use model memory as a substitute
-for retrieval.
+fetching. A provider-neutral discovery layer can additionally search beyond the
+registry; the Tavily adapter constrains official searches to CUC domains, labels
+other results as public references, removes common personal identifiers from
+outbound queries, and degrades to registry-only retrieval without credentials.
+Official WeChat discovery remains a future adapter and must retain the same
+authority, coverage, and citation controls.
 
 ## Conversation boundary
 
@@ -148,8 +150,8 @@ never treated as factual evidence. Sessions disappear when the process restarts.
 ## Rollout
 
 1. Collect failed questions and create human relevance labels.
-2. Add a governed search-provider adapter for new official webpages and
-   verified official-account articles.
+2. Add an official-WeChat discovery or ingestion adapter and evaluate it against
+   the governed Tavily web-search baseline.
 3. Replace the local subword baseline and compare retrieval ablations.
 4. Add claim-level entailment and temporal-conflict evaluation.
 5. Persist isolated sessions only when account and retention rules exist.

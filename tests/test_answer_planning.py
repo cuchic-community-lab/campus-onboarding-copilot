@@ -18,6 +18,16 @@ class AnswerPlanningTest(unittest.TestCase):
         self.assertEqual(plan["question_type"], "general_guidance")
         self.assertEqual(plan["fallback_route"], "public_web_discovery")
 
+    def test_general_career_question_searches_even_with_local_candidate(self):
+        plan = build_answer_plan("智能科学与技术的就业方向有哪些？", "experience_only")
+        self.assertEqual(plan["fallback_route"], "public_web_discovery")
+        self.assertTrue(plan["requires_web_enrichment"])
+
+    def test_current_official_question_searches_even_with_local_candidate(self):
+        plan = build_answer_plan("今年推免申请什么时候截止？", "supported")
+        self.assertEqual(plan["fallback_route"], "official_web_discovery")
+        self.assertTrue(plan["requires_web_enrichment"])
+
     def test_supported_question_stays_on_local_knowledge(self):
         plan = build_answer_plan("宿舍是几人间？", "experience_only")
         self.assertEqual(plan["fallback_route"], "local_knowledge")

@@ -326,7 +326,10 @@ class ExtractiveComposer:
                 prefix = "学校官网显示，"
                 certainty = "official"
             elif authority == "public_web":
-                prefix = "结合公开的陵水环境资料，"
+                prefix = (
+                    "公开资料显示，" if question_type == "general_guidance"
+                    else "结合公开的陵水环境资料，"
+                )
                 certainty = "public"
             else:
                 prefix = "现有待核实资料显示，"

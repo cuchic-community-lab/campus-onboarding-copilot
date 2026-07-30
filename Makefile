@@ -4,7 +4,7 @@ PORT ?= 8000
 -include .env.local
 export
 
-.PHONY: sync build query chat serve makers-check audit evaluate evaluate-chat publication-audit test demo
+.PHONY: sync build query chat serve makers-check search-check audit evaluate evaluate-chat publication-audit test demo
 
 sync:
 	PYTHONPATH=src $(PYTHON) -m campus_copilot.cli sync --all-files
@@ -25,6 +25,11 @@ makers-check:
 	@test "$(CAMPUS_LLM_PROVIDER)" = "makers" || (echo "Set CAMPUS_LLM_PROVIDER=makers in .env.local" && exit 1)
 	@test -n "$(CAMPUS_LLM_API_KEY)" || (echo "Set CAMPUS_LLM_API_KEY in .env.local" && exit 1)
 	PYTHONPATH=src $(PYTHON) -m campus_copilot.cli chat "宿舍的床多大？"
+
+search-check:
+	@test "$(CAMPUS_WEB_SEARCH_PROVIDER)" = "tavily" || (echo "Set CAMPUS_WEB_SEARCH_PROVIDER=tavily in .env.local" && exit 1)
+	@test -n "$(CAMPUS_WEB_SEARCH_API_KEY)" || (echo "Set CAMPUS_WEB_SEARCH_API_KEY in .env.local" && exit 1)
+	PYTHONPATH=src $(PYTHON) -m campus_copilot.cli chat "智能科学与技术的就业方向有哪些？"
 
 audit:
 	PYTHONPATH=src $(PYTHON) -m campus_copilot.cli audit

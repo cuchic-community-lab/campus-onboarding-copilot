@@ -147,12 +147,30 @@ Legacy HTTP-only pages are never added to the live-fetch allowlist. A manually
 verified excerpt may be stored as a dated `verified_web_snapshot`, labeled as a
 public reference with its uncertainty, while live fetching remains HTTPS-only.
 
-This is real retrieval, but deliberately not arbitrary search. New websites and
-official-account sources must first be added to the reviewed registry. Automatic
-discovery across the open web or WeChat requires a separate search provider
-(for example Tencent Web Search API or TokenHub), followed by the same domain,
-authority, freshness, and citation controls. Makers Models supplies the answer
-model; it is not itself a web-search service.
+The registry remains the low-latency reviewed source layer. Optional autonomous
+discovery is provided through a separate `SearchDiscoveryProvider`; the first
+adapter uses Tavily. When configured, official and public answer routes search
+beyond the registry, convert results into the same evidence contract, deduplicate
+URLs, and apply the existing authority, coverage, uncertainty, and citation
+controls. Official searches accept only `cuc.edu.cn` and its subdomains;
+non-official results remain `public_web`. Common email, phone, and long numeric
+identifiers are removed before sending a query to the provider.
+
+Makers Models supplies the answer model; it is not itself a web-search service.
+Without a search key, the application reports `registry_only` and keeps the
+reviewed-source behavior rather than pretending to have searched the open web.
+Official WeChat discovery still needs a separate provider or ingestion adapter.
+
+To enable autonomous search, add these values to ignored `.env.local`:
+
+```dotenv
+CAMPUS_WEB_SEARCH_PROVIDER=tavily
+CAMPUS_WEB_SEARCH_API_KEY=your-key
+```
+
+Then run `make search-check`. The returned `answer_plan` should show
+`web_discovery_executed: true`, `web_discovery_provider: tavily`, and the source
+cards should label newly found pages as autonomous official/public search.
 
 `/api/context` returns the same model-ready evidence packet and response policy.
 A provider receives only this packet and must:

@@ -56,15 +56,20 @@ def build_answer_plan(query: str, answerability: str) -> Dict[str, object]:
         "mixed_sources_review_required",
         "experience_only",
     }
-    requires_web_enrichment = question_type in {"arrival_preparation", "credential_wording"}
+    requires_web_enrichment = question_type in {
+        "arrival_preparation", "credential_wording", "current_official",
+        "institution_structure", "general_guidance",
+    }
     if question_type in {"arrival_preparation", "credential_wording"}:
         fallback_route = "official_and_public_web_discovery"
     elif question_type == "institution_structure":
         fallback_route = "official_web_discovery"
-    elif has_local_answer:
-        fallback_route = "local_knowledge"
+    elif question_type == "current_official":
+        fallback_route = "official_web_discovery"
     elif question_type == "general_guidance":
         fallback_route = "public_web_discovery"
+    elif has_local_answer:
+        fallback_route = "local_knowledge"
     else:
         fallback_route = "official_web_discovery"
 
