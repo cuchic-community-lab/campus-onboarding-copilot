@@ -4,10 +4,16 @@ PORT ?= 8000
 -include .env.local
 export
 
-.PHONY: sync build query chat serve makers-check search-check audit evaluate evaluate-chat publication-audit test demo
+.PHONY: sync official-sync official-review build query chat serve makers-check search-check audit evaluate evaluate-chat publication-audit test demo
 
 sync:
 	PYTHONPATH=src $(PYTHON) -m campus_copilot.cli sync --all-files
+
+official-sync:
+	PYTHONPATH=src $(PYTHON) -m campus_copilot.cli official-sync
+
+official-review:
+	PYTHONPATH=src $(PYTHON) -m campus_copilot.cli official-review
 
 build:
 	PYTHONPATH=src $(PYTHON) -m campus_copilot.cli build

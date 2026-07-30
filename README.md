@@ -149,7 +149,7 @@ public reference with its uncertainty, while live fetching remains HTTPS-only.
 
 The registry remains the low-latency reviewed source layer. Optional autonomous
 discovery is provided through a separate `SearchDiscoveryProvider`; the first
-adapter uses Tavily. When configured, official and public answer routes search
+development adapter uses Tavily. When configured, official and public answer routes search
 beyond the registry, convert results into the same evidence contract, deduplicate
 URLs, and apply the existing authority, coverage, uncertainty, and citation
 controls. Official searches accept only `cuc.edu.cn` and its subdomains;
@@ -161,7 +161,12 @@ Without a search key, the application reports `registry_only` and keeps the
 reviewed-source behavior rather than pretending to have searched the open web.
 Official WeChat discovery still needs a separate provider or ingestion adapter.
 
-To enable autonomous search, add these values to ignored `.env.local`:
+The Tavily adapter is for development evaluation, not the default for a service
+deployed in mainland China. A mainland production deployment should use a
+domestic provider and endpoint after privacy, source-URL, content-safety, and
+network-reliability review. Provider credentials remain separate from Makers.
+
+To evaluate Tavily locally, add these values to ignored `.env.local`:
 
 ```dotenv
 CAMPUS_WEB_SEARCH_PROVIDER=tavily
@@ -171,6 +176,29 @@ CAMPUS_WEB_SEARCH_API_KEY=your-key
 Then run `make search-check`. The returned `answer_plan` should show
 `web_discovery_executed: true`, `web_discovery_provider: tavily`, and the source
 cards should label newly found pages as autonomous official/public search.
+
+## Governed official-site corpus
+
+The durable official corpus is maintained separately from per-question web
+search. `config/official_crawl.json` defines HTTPS hosts, path prefixes, seeds,
+page limits, issuers, and tags. The synchronizer respects `robots.txt`, refuses
+redirects outside the allowlist, ignores media links, bounds response size, and
+stores content-addressed immutable snapshots under ignored
+`data/official_sites/`.
+
+```bash
+make official-sync
+make official-review
+PYTHONPATH=src .venv/bin/python -m campus_copilot.cli official-review \
+  --approve 'https://hainan.cuc.edu.cn/example/page.htm'
+make build
+```
+
+New and changed pages are always `pending`. An unchanged page retains its
+review status; a changed checksum creates a new immutable version and removes
+the old approval from the active page. Only the latest `approved` snapshot is
+converted into an `official_web` document during `make build`. This keeps
+automatic discovery separate from authority to publish an answer.
 
 `/api/context` returns the same model-ready evidence packet and response policy.
 A provider receives only this packet and must:

@@ -134,11 +134,16 @@ The planner distinguishes four evidence paths:
 All four paths can execute against sources registered in
 `config/web_sources.json`. The live adapter performs allowlisted HTML/PDF
 fetching. A provider-neutral discovery layer can additionally search beyond the
-registry; the Tavily adapter constrains official searches to CUC domains, labels
+registry; the development Tavily adapter constrains official searches to CUC domains, labels
 other results as public references, removes common personal identifiers from
 outbound queries, and degrades to registry-only retrieval without credentials.
 Official WeChat discovery remains a future adapter and must retain the same
 authority, coverage, and citation controls.
+
+For a mainland-China production deployment, keep the provider interface but
+replace the development Tavily adapter with a reviewed domestic search service.
+The durable school corpus should come from `official-sync` plus explicit
+`official-review`, not from silently persisting per-question search results.
 
 ## Conversation boundary
 

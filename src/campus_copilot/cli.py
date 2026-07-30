@@ -11,6 +11,7 @@ from .server import serve
 from .service import audit_corpus, build_knowledge_base, corpus_stats
 from .sync import sync_corpus
 from .web_retrieval import configured_web_retriever
+from .official_sync import review_official_page, sync_official_sites
 
 
 def _print(value: object) -> None:
@@ -43,6 +44,13 @@ def main() -> None:
     sub.add_parser("stats")
     sub.add_parser("evaluate")
     sub.add_parser("evaluate-chat")
+    official_sync_parser = sub.add_parser("official-sync")
+    official_sync_parser.add_argument("--dry-run", action="store_true")
+    official_sync_parser.add_argument("--max-pages", type=int)
+    official_review_parser = sub.add_parser("official-review")
+    review_group = official_review_parser.add_mutually_exclusive_group()
+    review_group.add_argument("--approve")
+    review_group.add_argument("--reject")
     args = parser.parse_args()
 
     if args.command == "sync":
@@ -68,6 +76,18 @@ def main() -> None:
         _print(evaluate())
     elif args.command == "evaluate-chat":
         _print(evaluate_chat())
+    elif args.command == "official-sync":
+        _print(sync_official_sites(
+            persist=not args.dry_run,
+            max_pages_per_source=args.max_pages,
+        ))
+    elif args.command == "official-review":
+        if args.approve:
+            _print(review_official_page(args.approve, "approved"))
+        elif args.reject:
+            _print(review_official_page(args.reject, "rejected"))
+        else:
+            _print(review_official_page())
 
 
 if __name__ == "__main__":
