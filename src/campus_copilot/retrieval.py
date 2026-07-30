@@ -23,6 +23,13 @@ SYNONYMS = {
     "床": ["床铺", "床垫"],
     "多大": ["尺寸", "规格", "长", "宽"],
     "尺寸": ["规格", "长", "宽"],
+    "保研": ["推免", "推荐免试", "免试攻读"],
+    "推免": ["保研", "推荐免试", "免试攻读"],
+    "推荐免试": ["保研", "推免", "免试攻读"],
+}
+
+DOMAIN_ENTITY_GROUPS = {
+    "recommendation_admission": ("保研", "推免", "推荐免试", "免试攻读"),
 }
 
 POLICY_TERMS = ("必须", "规定", "办法", "申请", "截止", "毕业", "选课", "成绩", "请假", "军训", "办理")
@@ -34,6 +41,7 @@ CONCEPT_TERMS = (
     "外卖", "食堂", "学分", "最低", "游泳", "必修", "考试", "评分", "报到",
     "军训", "请假", "校历", "摆渡车", "交通", "绩点", "gpa", "社团", "四级",
     "床垫", "床铺", "尺寸", "规格", "多大", "长", "宽", "床",
+    "推荐免试", "免试攻读", "推免", "保研", "保留学籍",
 )
 
 DIMENSION_QUERY_TERMS = ("多大", "尺寸", "规格", "长宽", "多长", "多宽", "厘米", "cm")
@@ -96,6 +104,24 @@ def _query_concepts(query: str) -> List[str]:
         return concepts
     candidates = chinese_search_terms(query).split()
     return list(dict.fromkeys(term for term in candidates if len(term) >= 2))[:10]
+
+
+def _requested_domain_entities(query: str) -> List[str]:
+    lowered = query.lower()
+    return [
+        group for group, aliases in DOMAIN_ENTITY_GROUPS.items()
+        if any(alias in lowered for alias in aliases)
+    ]
+
+
+def _domain_entity_match(groups: List[str], text: str) -> float:
+    if not groups:
+        return 0.0
+    matched = 0
+    for group in groups:
+        aliases = DOMAIN_ENTITY_GROUPS[group]
+        matched += int(any(alias in text for alias in aliases))
+    return matched / len(groups)
 
 
 def _coverage(concepts: List[str], text: str) -> float:
@@ -163,6 +189,8 @@ class HybridRetriever:
     def search(self, query: str, top_k: int = 6, profile: Optional[Dict[str, str]] = None) -> Dict[str, object]:
         profile = profile or {}
         query_concepts = _query_concepts(query)
+        requested_entities = _requested_domain_entities(query)
+        availability_query = any(term in query for term in ("有吗", "有没有", "机会", "是否"))
         procedure_query = any(term in query for term in ("怎么", "如何", "操作", "步骤"))
         rule_query = any(term in query for term in ("规定", "最低", "必须", "退课", "学分"))
         dimension_query = any(term in query.lower() for term in DIMENSION_QUERY_TERMS)
@@ -216,10 +244,17 @@ class HybridRetriever:
                 query_features,
                 self.vectorizer.features(anchor + " " + (row["heading_path"] or "")),
             )
-            full_blob = " ".join([row["title"] or "", row["heading_path"] or "", row["text"] or ""])
+            tags = " ".join(json.loads(row["tags_json"] or "[]"))
+            full_blob = " ".join([
+                row["title"] or "", row["heading_path"] or "", tags, row["text"] or "",
+            ]).lower()
             anchor_blob = " ".join([row["title"] or "", row["heading_path"] or "", anchor])
             concept_coverage = _coverage(query_concepts, full_blob)
             anchor_coverage = _coverage(query_concepts, anchor_blob)
+            domain_entity_match = _domain_entity_match(requested_entities, full_blob)
+            domain_entity_multiplier = 1.0
+            if requested_entities and not domain_entity_match:
+                domain_entity_multiplier = 0.35
             attribute_match = 1.0 if dimension_query and DIMENSION_PATTERN.search(full_blob) else 0.0
             structured_attribute_match = (
                 1.0 if attribute_match and row["chunk_type"] == "structured_fact" else 0.0
@@ -237,6 +272,15 @@ class HybridRetriever:
                 task_multiplier *= 1.4
             if "多少" in query and re.search(r"\d+(?:\.\d+)?\s*(?:学分|元|人|天|小时|分)", row["text"] or ""):
                 task_multiplier *= 1.18
+            if (
+                availability_query
+                and domain_entity_match
+                and row["chunk_type"] == "faq"
+                and re.search(r"(?:比例|人数|\d+(?:\.\d+)?%)", row["text"] or "")
+            ):
+                # Availability questions benefit from a direct observed outcome
+                # alongside policy documents that only establish a mechanism.
+                task_multiplier *= 1.45
             applicability = 1.0
             if profile.get("cohort") and row["cohort"] and profile["cohort"] != row["cohort"]:
                 applicability *= 0.75
@@ -249,7 +293,8 @@ class HybridRetriever:
                 + 0.03 * anchor_coverage
                 + 0.06 * attribute_match
                 + 0.02 * structured_attribute_match
-            ) * task_multiplier * applicability
+                + 0.08 * domain_entity_match
+            ) * task_multiplier * applicability * domain_entity_multiplier
             trust_tiebreaker = 0.0015 * authority_confidence
             score = relevance_score + trust_tiebreaker
             ranked.append((score, row, {
@@ -261,6 +306,7 @@ class HybridRetriever:
                 "anchor_coverage": round(anchor_coverage, 4),
                 "attribute_match": attribute_match,
                 "structured_attribute_match": structured_attribute_match,
+                "domain_entity_match": domain_entity_match,
                 "relevance_score": round(relevance_score, 6),
                 "authority_confidence": authority_confidence,
                 "trust_tiebreaker": round(trust_tiebreaker, 6),
@@ -268,15 +314,23 @@ class HybridRetriever:
                 "assertion_multiplier": 1.0,
                 "task_multiplier": round(task_multiplier, 4),
                 "applicability_multiplier": applicability,
+                "domain_entity_multiplier": domain_entity_multiplier,
             }))
         ranked.sort(key=lambda item: item[0], reverse=True)
 
         results: List[Dict[str, object]] = []
-        for score, row, explanation in ranked[:top_k]:
+        document_counts: Counter = Counter()
+        for score, row, explanation in ranked:
+            per_document_limit = 5 if row["chunk_type"] == "structured_fact" else 2
+            if document_counts[row["document_id"]] >= per_document_limit:
+                continue
             item = _row_to_result(row)
             item["score"] = round(score, 6)
             item["score_explanation"] = explanation
             results.append(item)
+            document_counts[row["document_id"]] += 1
+            if len(results) >= top_k:
+                break
 
         intent = _intent(query)
         if results:

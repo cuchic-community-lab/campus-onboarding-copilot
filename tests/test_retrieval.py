@@ -8,6 +8,57 @@ from campus_copilot.retrieval import HybridRetriever
 
 
 class RetrievalTest(unittest.TestCase):
+    def test_domain_entity_match_separates_recommendation_from_status_retention(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "test.db"
+            peer = DocumentRecord(
+                document_id="peer", title="新生问答", source_url="https://example.test/peer",
+                local_path="", media_type="markdown", source_kind="peer_faq",
+                authority_tier="peer_experience", assertion_policy="label_as_experience",
+                parse_status="parsed",
+            )
+            handbook = DocumentRecord(
+                document_id="handbook", title="学生手册", source_url="https://example.test/handbook",
+                local_path="", media_type="pdf", source_kind="official_guidance",
+                authority_tier="official_guidance", assertion_policy="assert_if_current",
+                parse_status="parsed",
+            )
+            policy = DocumentRecord(
+                document_id="policy", title="推荐优秀本科毕业生免试攻读研究生办法",
+                source_url="https://example.test/policy", local_path="", media_type="pdf",
+                source_kind="official_policy", authority_tier="official_policy",
+                assertion_policy="assert_with_citation", parse_status="parsed",
+            )
+            chunks = [
+                ChunkRecord(
+                    chunk_id="peer", document_id="peer", title=peer.title,
+                    text="问题：毕业出路有哪些？回答：有保研机会，往届保研比例约17%。",
+                    chunk_type="faq", sequence=0, tags=["保研"],
+                    authority_tier="peer_experience", assertion_policy="label_as_experience",
+                    source_url=peer.source_url,
+                ),
+                ChunkRecord(
+                    chunk_id="retention", document_id="handbook", title=handbook.title,
+                    text="学生因创业可以申请保留学籍。保留学籍原则上以一学年为单位。",
+                    chunk_type="document", sequence=0, tags=["学籍"],
+                    authority_tier="official_guidance", assertion_policy="assert_if_current",
+                    source_url=handbook.source_url,
+                ),
+                ChunkRecord(
+                    chunk_id="policy", document_id="policy", title=policy.title,
+                    text="本办法规范推荐优秀应届本科毕业生免试攻读硕士学位研究生工作。",
+                    chunk_type="document", sequence=0, tags=["推免", "保研"],
+                    authority_tier="official_policy", assertion_policy="assert_with_citation",
+                    source_url=policy.source_url,
+                ),
+            ]
+            rebuild(path, [peer, handbook, policy], chunks)
+            result = HybridRetriever(path).search("学生有保研机会吗？")
+            self.assertEqual(result["results"][0]["chunk_id"], "peer")
+            self.assertEqual(result["results"][0]["score_explanation"]["domain_entity_match"], 1.0)
+            retention = next(item for item in result["results"] if item["chunk_id"] == "retention")
+            self.assertEqual(retention["score_explanation"]["domain_entity_multiplier"], 0.35)
+
     def test_hybrid_search_returns_relevant_faq_and_labels_experience(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "test.db"

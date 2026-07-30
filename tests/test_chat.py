@@ -64,6 +64,11 @@ class ChatTest(unittest.TestCase):
         query = "本科生第一次选课需要完成哪些步骤以及注意哪些截止时间？"
         self.assertEqual(contextualize_query(query, history), query)
 
+    def test_correction_turn_replaces_previous_topic_with_corrected_entity(self):
+        history = [{"role": "user", "content": "学生有保留学籍的机会吗？"}]
+        self.assertEqual(contextualize_query("我说的是保研", history), "保研")
+        self.assertEqual(contextualize_query("不是保留学籍，是保研", history), "保研")
+
     def test_weak_follow_up_topic_match_is_refused(self):
         retriever = FakeRetriever()
         service = GroundedChatService(retriever, composer=ExtractiveComposer())

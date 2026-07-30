@@ -9,6 +9,10 @@ from .context_builder import build_context_packet
 
 
 FOLLOW_UP_MARKERS = ("那", "这个", "它", "还有", "上面", "刚才", "呢", "具体", "怎么办", "为什么")
+CORRECTION_PATTERNS = (
+    re.compile(r"(?:我说的是|我是说|指的是|应该是)\s*([^，。！？；]+)"),
+    re.compile(r"不是[^，。！？；]+[，,；;]\s*(?:是|而是)\s*([^，。！？；]+)"),
+)
 
 
 class SessionStore:
@@ -41,6 +45,10 @@ class SessionStore:
 
 
 def contextualize_query(query: str, history: List[Dict[str, object]]) -> str:
+    for pattern in CORRECTION_PATTERNS:
+        match = pattern.search(query)
+        if match:
+            return match.group(1).strip()
     user_messages = [str(item.get("content", "")) for item in history if item.get("role") == "user"]
     if not user_messages:
         return query
