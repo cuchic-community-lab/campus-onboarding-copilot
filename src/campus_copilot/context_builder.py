@@ -29,6 +29,7 @@ def build_context_packet(
         evidence.append({
             "evidence_id": f"S{index}",
             "title": result["title"],
+            "chunk_type": result.get("chunk_type", "document"),
             "authority_tier": result["authority_tier"],
             "assertion_policy": result["assertion_policy"],
             "page_number": result["page_number"],

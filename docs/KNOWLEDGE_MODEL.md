@@ -36,6 +36,7 @@ applicability.
 | Source | Unit | Why |
 | --- | --- | --- |
 | FAQ | complete question + complete answer | keeps the question's scope and the answer's caveats together |
+| safe student measurement sheet | one item/measurement row | makes a bed, desk, or cabinet dimension independently retrievable and citable |
 | policy | heading-aware paragraphs, 350-850 Chinese characters | preserves conditions, exceptions, article numbers, and page citations |
 | service manual | numbered steps grouped within a page | lets the answer composer assemble an ordered procedure |
 | form | resource entity, not factual passage | a blank form is something to open or submit, not a rule |
@@ -55,9 +56,16 @@ FAQ answers depend on their questions; procedure steps depend on their order.
 3. Retrieve an offline second candidate list with hashed character subword
    vectors and a small domain synonym map.
 4. Fuse candidate ranks with reciprocal-rank fusion.
-5. Rerank with question/rule-anchor similarity, source authority, assertion
-   policy, and applicability.
+5. Rerank primarily with question/rule-anchor similarity, concept and attribute
+   coverage, source-type fit, and applicability. Authority is only a near-tie
+   signal; it does not multiplicatively demote student experience.
 6. Produce an answerability state before calling a model.
+
+Retrieval relevance and answer trust are separate concerns. Student-authored
+guides and measurements may rank first when they directly answer a lifestyle
+question, while the answer layer must label them as student experience. Formal
+policy questions still prefer policy text because that source type matches the
+question, not because all non-official material is globally suppressed.
 
 The offline vector is a testable baseline, not the production semantic model.
 Its interface should later be replaced by multilingual embeddings. Keep FTS5:

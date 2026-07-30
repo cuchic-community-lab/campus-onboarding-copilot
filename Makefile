@@ -1,4 +1,4 @@
-PYTHON ?= python3
+PYTHON ?= $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
 
 .PHONY: sync build query chat serve audit evaluate evaluate-chat test demo
 

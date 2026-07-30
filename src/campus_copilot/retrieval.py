@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Tuple
 
 from .db import chinese_search_terms, connect
-from .source_policy import AUTHORITY_BOOST
+from .source_policy import AUTHORITY_CONFIDENCE
 
 
 SYNONYMS = {
@@ -20,6 +20,9 @@ SYNONYMS = {
     "交通": ["摆渡车", "公交", "出行"],
     "成绩": ["绩点", "gpa", "学分"],
     "吃饭": ["食堂", "餐饮", "饭卡"],
+    "床": ["床铺", "床垫"],
+    "多大": ["尺寸", "规格", "长", "宽"],
+    "尺寸": ["规格", "长", "宽"],
 }
 
 POLICY_TERMS = ("必须", "规定", "办法", "申请", "截止", "毕业", "选课", "成绩", "请假", "军训", "办理")
@@ -30,6 +33,13 @@ CONCEPT_TERMS = (
     "宿舍", "寝室", "选课", "退课", "规定", "操作", "步骤", "快递", "地址",
     "外卖", "食堂", "学分", "最低", "游泳", "必修", "考试", "评分", "报到",
     "军训", "请假", "校历", "摆渡车", "交通", "绩点", "gpa", "社团", "四级",
+    "床垫", "床铺", "尺寸", "规格", "多大", "长", "宽", "床",
+)
+
+DIMENSION_QUERY_TERMS = ("多大", "尺寸", "规格", "长宽", "多长", "多宽", "厘米", "cm")
+DIMENSION_PATTERN = re.compile(
+    r"(?:\d+(?:\.\d+)?\s*(?:m|米|cm|厘米|mm|毫米)|\d+\s*[x×*]\s*\d+)",
+    re.IGNORECASE,
 )
 
 
@@ -77,7 +87,7 @@ def _intent(query: str) -> str:
 
 
 def _query_concepts(query: str) -> List[str]:
-    lowered = query.lower()
+    lowered = expand_query(query).lower()
     concepts: List[str] = []
     for term in sorted(CONCEPT_TERMS, key=len, reverse=True):
         if term in lowered and term not in concepts:
@@ -155,6 +165,7 @@ class HybridRetriever:
         query_concepts = _query_concepts(query)
         procedure_query = any(term in query for term in ("怎么", "如何", "操作", "步骤"))
         rule_query = any(term in query for term in ("规定", "最低", "必须", "退课", "学分"))
+        dimension_query = any(term in query.lower() for term in DIMENSION_QUERY_TERMS)
         connection = connect(self.db_path)
         try:
             fts = _fts_query(query)
@@ -196,12 +207,7 @@ class HybridRetriever:
                 continue
             lexical_rrf = 1.0 / (60 + lexical_rank[chunk_id]) if chunk_id in lexical_rank else 0.0
             semantic_rrf = 1.0 / (60 + semantic_rank[chunk_id]) if chunk_id in semantic_rank else 0.0
-            authority = AUTHORITY_BOOST.get(row["authority_tier"], 0.85)
-            assertion_multiplier = {
-                "navigation_only": 0.82,
-                "do_not_assert": 0.78,
-                "do_not_assert_until_ocr": 0.7,
-            }.get(row["assertion_policy"], 1.0)
+            authority_confidence = AUTHORITY_CONFIDENCE.get(row["authority_tier"], 0.5)
             # Compare the query against the semantic anchor (FAQ question or
             # leading rule sentence), not only the full passage. Full-text
             # cosine otherwise systematically favors short generic answers.
@@ -214,6 +220,10 @@ class HybridRetriever:
             anchor_blob = " ".join([row["title"] or "", row["heading_path"] or "", anchor])
             concept_coverage = _coverage(query_concepts, full_blob)
             anchor_coverage = _coverage(query_concepts, anchor_blob)
+            attribute_match = 1.0 if dimension_query and DIMENSION_PATTERN.search(full_blob) else 0.0
+            structured_attribute_match = (
+                1.0 if attribute_match and row["chunk_type"] == "structured_fact" else 0.0
+            )
             task_multiplier = 1.0
             if procedure_query:
                 if any(term in (row["title"] or "") for term in ("服务手册", "指南", "标准")):
@@ -221,7 +231,10 @@ class HybridRetriever:
                 elif row["authority_tier"] == "official_policy":
                     task_multiplier *= 0.96
             if rule_query and row["authority_tier"] == "official_policy":
-                task_multiplier *= 1.25
+                # This is query-to-source-type fit, not a generic authority
+                # boost: a request for a formal rule should prefer its policy
+                # text over a handbook copy of the same rule.
+                task_multiplier *= 1.4
             if "多少" in query and re.search(r"\d+(?:\.\d+)?\s*(?:学分|元|人|天|小时|分)", row["text"] or ""):
                 task_multiplier *= 1.18
             applicability = 1.0
@@ -229,12 +242,16 @@ class HybridRetriever:
                 applicability *= 0.75
             if profile.get("major") and row["major"] and profile["major"] != row["major"]:
                 applicability *= 0.75
-            score = (
+            relevance_score = (
                 (lexical_rrf + semantic_rrf)
                 + 0.018 * anchor_similarity
-                + 0.035 * concept_coverage
-                + 0.025 * anchor_coverage
-            ) * authority * assertion_multiplier * task_multiplier * applicability
+                + 0.045 * concept_coverage
+                + 0.03 * anchor_coverage
+                + 0.06 * attribute_match
+                + 0.02 * structured_attribute_match
+            ) * task_multiplier * applicability
+            trust_tiebreaker = 0.0015 * authority_confidence
+            score = relevance_score + trust_tiebreaker
             ranked.append((score, row, {
                 "lexical_rrf": round(lexical_rrf, 6),
                 "local_vector_rrf": round(semantic_rrf, 6),
@@ -242,8 +259,13 @@ class HybridRetriever:
                 "anchor_similarity": round(anchor_similarity, 4),
                 "concept_coverage": round(concept_coverage, 4),
                 "anchor_coverage": round(anchor_coverage, 4),
-                "authority_multiplier": authority,
-                "assertion_multiplier": assertion_multiplier,
+                "attribute_match": attribute_match,
+                "structured_attribute_match": structured_attribute_match,
+                "relevance_score": round(relevance_score, 6),
+                "authority_confidence": authority_confidence,
+                "trust_tiebreaker": round(trust_tiebreaker, 6),
+                "authority_multiplier": 1.0,
+                "assertion_multiplier": 1.0,
                 "task_multiplier": round(task_multiplier, 4),
                 "applicability_multiplier": applicability,
             }))

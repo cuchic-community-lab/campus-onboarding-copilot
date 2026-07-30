@@ -111,6 +111,41 @@ def chunk_paragraphs(
     return chunks
 
 
+def chunk_structured_rows(document: DocumentRecord) -> List[ChunkRecord]:
+    """Keep each spreadsheet record atomic while preserving its sheet name."""
+    chunks: List[ChunkRecord] = []
+    sheet = ""
+    row_parts: List[str] = []
+
+    def flush() -> None:
+        if not row_parts:
+            return
+        row = " ".join(row_parts).strip()
+        row_parts.clear()
+        # Standalone sequence numbers and empty spreadsheet rows are not facts.
+        if "|" not in row or not re.search(r"\d", row):
+            return
+        row = re.sub(r"\s*\|\s*=DISPIMG\(.*\)\s*$", "", row)
+        text = f"{sheet}\n{row}" if sheet else row
+        chunks.append(_make_chunk(document, text, len(chunks), "structured_fact", sheet))
+
+    for raw_line in document.content.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        if line.startswith("工作表："):
+            flush()
+            sheet = line.removeprefix("工作表：").strip()
+            continue
+        if re.match(r"^\d+\s*\|", line):
+            flush()
+            row_parts.append(line)
+        elif row_parts and not line.isdigit():
+            row_parts.append(line)
+    flush()
+    return chunks
+
+
 def chunk_document(document: DocumentRecord) -> List[ChunkRecord]:
     if document.source_kind in {"official_link", "community_link", "form"}:
         if not document.content:
@@ -118,6 +153,10 @@ def chunk_document(document: DocumentRecord) -> List[ChunkRecord]:
         return [_make_chunk(document, document.content, 0, "resource")]
     if document.parse_status != "parsed":
         return []
+    if document.media_type == "excel":
+        structured = chunk_structured_rows(document)
+        if structured:
+            return structured
     if document.pages:
         result: List[ChunkRecord] = []
         for page in document.pages:

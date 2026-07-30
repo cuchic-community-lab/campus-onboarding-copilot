@@ -1,6 +1,6 @@
 import unittest
 
-from campus_copilot.chunking import chunk_faq, chunk_paragraphs
+from campus_copilot.chunking import chunk_faq, chunk_paragraphs, chunk_structured_rows
 from campus_copilot.models import DocumentRecord
 
 
@@ -24,6 +24,21 @@ class ChunkingTest(unittest.TestCase):
         chunks = chunk_paragraphs(document("official_guidance"), text, target_chars=100, max_chars=180)
         self.assertGreaterEqual(len(chunks), 2)
         self.assertTrue(all(chunk.text.strip() for chunk in chunks))
+
+    def test_spreadsheet_rows_become_atomic_facts(self):
+        item = document("student_reference")
+        item.media_type = "excel"
+        item.content = (
+            "工作表：生活一区\n序号 | 类型 | 规格\n"
+            "1 | 床 | 高架床\n（上床下桌） | 长2.08m*宽0.97m | =DISPIMG(\"ID_1\",1)\n"
+            "2\n3 | 书桌 | 宽1m*长0.6m\n"
+        )
+        chunks = chunk_structured_rows(item)
+        self.assertEqual(len(chunks), 2)
+        self.assertIn("生活一区", chunks[0].text)
+        self.assertIn("长2.08m*宽0.97m", chunks[0].text)
+        self.assertNotIn("书桌", chunks[0].text)
+        self.assertNotIn("DISPIMG", chunks[0].text)
 
 
 if __name__ == "__main__":

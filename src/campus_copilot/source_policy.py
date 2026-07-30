@@ -18,6 +18,7 @@ OFFICIAL_DOC_PATTERNS = (
 )
 
 SENSITIVE_RECORD_TERMS = ("积分", "志愿时长记录", "参与加分", "名单", "成绩记录")
+STUDENT_REFERENCE_TERMS = ("入学指南", "家具尺寸统计表")
 
 
 def _looks_official(title: str, tags: list) -> bool:
@@ -29,6 +30,14 @@ def classify_file(title: str, media_type: str, tags: list) -> SourceDecision:
     privacy_risk = "review_required" if any(term in title for term in SENSITIVE_RECORD_TERMS) else "low"
     if _looks_official(title, tags):
         return SourceDecision("policy", "official_policy", "assert_with_citation", "中国传媒大学", privacy_risk)
+    if any(term in title for term in STUDENT_REFERENCE_TERMS):
+        return SourceDecision(
+            "student_reference",
+            "peer_experience",
+            "label_as_experience",
+            "Student contributor",
+            privacy_risk,
+        )
     if any(term in title for term in ("学生手册", "服务手册", "校历", "考试标准", "评分标准")):
         return SourceDecision("official_guidance", "official_guidance", "assert_if_current", "中国传媒大学或相关办学机构", privacy_risk)
     if media_type in {"word", "excel"} and any(term in title for term in ("申请表", "审批表")):
@@ -49,10 +58,12 @@ def faq_decision() -> SourceDecision:
     return SourceDecision("peer_faq", "peer_experience", "label_as_experience", "Student contributor")
 
 
-AUTHORITY_BOOST = {
-    "official_policy": 1.15,
-    "official_guidance": 1.08,
-    "peer_experience": 1.0,
-    "resource": 0.92,
-    "unverified": 0.85,
+# Confidence is retained for display and near-tie ordering. It must not
+# multiplicatively suppress a highly relevant student-authored passage.
+AUTHORITY_CONFIDENCE = {
+    "official_policy": 1.0,
+    "official_guidance": 0.9,
+    "peer_experience": 0.8,
+    "resource": 0.6,
+    "unverified": 0.5,
 }

@@ -65,10 +65,12 @@ class ExtractiveComposer:
                 "unresolved": unresolved,
             }
 
-        evidence = [
+        eligible = [
             item for item in context_packet.get("evidence", [])
             if item.get("assertion_policy") not in {"navigation_only", "do_not_assert", "do_not_assert_until_ocr"}
-        ][:1]
+        ]
+        evidence_limit = 3 if eligible and eligible[0].get("chunk_type") == "structured_fact" else 1
+        evidence = eligible[:evidence_limit]
         if not evidence:
             return {
                 "answer": "检索到了相关资源，但当前内容不能直接作为回答依据。请查看学校最新通知或联系对应部门。",

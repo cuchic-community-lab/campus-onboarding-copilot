@@ -20,8 +20,10 @@ The durable layer is SQLite, not a vector database:
 - `chunk_fts` provides inspectable lexical retrieval over Chinese bigrams,
   titles, headings, and tags.
 - local hashed subword vectors provide an offline second retrieval channel.
-- reciprocal-rank fusion combines the two channels; authority and student
-  applicability are explicit ranking features.
+- reciprocal-rank fusion combines the two channels; semantic/attribute
+  relevance and student applicability dominate ranking. Authority is retained
+  as answer metadata and only a small near-tie signal, so a directly relevant
+  student measurement is not suppressed by an unrelated official passage.
 
 The local vector channel is a reproducible baseline, not a claim of deep
 semantic understanding. Replace `LocalSubwordVectorizer` with a production
@@ -30,12 +32,18 @@ embedding provider later while keeping the document and citation model.
 ## Domain-aware chunking
 
 - FAQ: one question and its complete answer is one chunk.
+- Safe student spreadsheets: one measured item per structured fact chunk.
 - Policy/handbook: preserve heading path and page, then group complete
   paragraphs into roughly 350-800 Chinese characters.
 - Procedures: keep numbered steps together whenever possible.
 - Forms and external links: model them as resources/actions instead of using
   them as factual answer passages.
 - Images and scanned PDFs: remain non-assertable until OCR succeeds.
+
+Student-authored guides and measurements are first-class evidence in this
+student-built product. They are cited as student experience rather than
+silently upgraded to school policy. Privacy-sensitive record spreadsheets
+remain quarantined.
 
 No fixed-token splitter is used across all sources. Fixed token windows cut a
 condition away from its rule, split a procedure in the middle, and destroy FAQ
@@ -66,6 +74,9 @@ python3 -m venv .venv
 Without them, the full FAQ and links are searchable and binary documents are
 kept in the catalog with `metadata_only` parse status. The system will not
 pretend an unparsed PDF supports an answer.
+
+`make` automatically uses `.venv/bin/python` when that environment exists, so
+a complete index is not accidentally rebuilt with a parser-free system Python.
 
 ## API
 

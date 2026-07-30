@@ -16,6 +16,12 @@ class SourcePolicyTest(unittest.TestCase):
     def test_student_faq_is_never_official(self):
         self.assertEqual(faq_decision().assertion_policy, "label_as_experience")
 
+    def test_student_measurement_is_citable_as_labeled_experience(self):
+        decision = classify_file("生活一、二区家具尺寸统计表.xlsx", "excel", ["生活", "家具", "尺寸"])
+        self.assertEqual(decision.source_kind, "student_reference")
+        self.assertEqual(decision.authority_tier, "peer_experience")
+        self.assertEqual(decision.assertion_policy, "label_as_experience")
+
     def test_cuc_link_is_official_navigation_only(self):
         decision = classify_link("选课系统", "http://xsxk.cuc.edu.cn/", ["选课"])
         self.assertEqual(decision.authority_tier, "official_guidance")

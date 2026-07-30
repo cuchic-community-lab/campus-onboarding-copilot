@@ -52,6 +52,24 @@ class CompositionTest(unittest.TestCase):
         self.assertEqual(result["citations"], [])
         self.assertEqual(result["claims"], [])
 
+    def test_structured_facts_can_combine_multiple_relevant_rows(self):
+        context = packet()
+        context["evidence"] = [
+            {
+                **context["evidence"][0],
+                "evidence_id": f"S{index}",
+                "chunk_type": "structured_fact",
+                "text": text,
+            }
+            for index, text in enumerate(
+                ["生活一区 床垫 2m×1m", "生活二区 床垫 2.1m×1.01m", "生活一区 床架 2.08m×0.97m"],
+                start=1,
+            )
+        ]
+        result = ExtractiveComposer().generate(context)
+        self.assertEqual(result["citations"], ["S1", "S2", "S3"])
+        self.assertIn("2.1m×1.01m", result["answer"])
+
 
 if __name__ == "__main__":
     unittest.main()
