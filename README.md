@@ -128,6 +128,24 @@ provider outage automatically falls back to the local composer. The current
 session store is intentionally process-local; persistence, account isolation,
 and cross-device history belong to a later production phase.
 
+### Tencent EdgeOne Makers Models
+
+The repository includes a provider preset for Makers Models. Create a dedicated
+API key in `Makers > Models > API Key`, then keep it in the ignored local file:
+
+```bash
+cp .env.example .env.local
+# Edit .env.local and set CAMPUS_LLM_API_KEY without committing the file.
+make makers-check
+make serve
+```
+
+The preset selects `https://ai-gateway.edgeone.link/v1` and
+`@makers/deepseek-v4-flash`. Either can still be overridden through
+`CAMPUS_LLM_BASE_URL` and `CAMPUS_LLM_MODEL`, preserving provider portability.
+`GET /api/health` reports the provider, model, and whether a credential is
+configured, but never returns the credential itself.
+
 ## Current corpus boundary
 
 The public site is a useful seed corpus, not a complete official source of

@@ -68,6 +68,14 @@ schema:
 }
 ```
 
+Makers Models is available as the `CAMPUS_LLM_PROVIDER=makers` preset. It uses
+the EdgeOne OpenAI-compatible gateway and defaults to the built-in
+`@makers/deepseek-v4-flash` model. The API key lives only in ignored
+`.env.local` during local development. Model responses request JSON mode; a
+string or missing `unresolved` field is normalized to a list, while citations,
+claims, authority labels, and refusal behavior remain subject to strict
+validation.
+
 ## Post-generation validator
 
 Before returning an answer:

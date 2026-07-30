@@ -6,25 +6,47 @@ from typing import Dict, List, Optional, Protocol, Tuple
 from urllib import request
 
 
+PROVIDER_PRESETS = {
+    "makers": {
+        "base_url": "https://ai-gateway.edgeone.link/v1",
+        "model": "@makers/deepseek-v4-flash",
+        "requires_api_key": True,
+    },
+}
+
+
 @dataclass(frozen=True)
 class ProviderConfig:
+    provider: str
     base_url: str
     model: str
     api_key: str
+    requires_api_key: bool = False
     timeout_seconds: float = 30.0
 
     @classmethod
     def from_env(cls) -> "ProviderConfig":
+        provider = os.getenv("CAMPUS_LLM_PROVIDER", "custom").strip().lower() or "custom"
+        preset = PROVIDER_PRESETS.get(provider, {})
         return cls(
-            base_url=os.getenv("CAMPUS_LLM_BASE_URL", "https://api.openai.com/v1").rstrip("/"),
-            model=os.getenv("CAMPUS_LLM_MODEL", "").strip(),
+            provider=provider,
+            base_url=os.getenv(
+                "CAMPUS_LLM_BASE_URL",
+                str(preset.get("base_url", "https://api.openai.com/v1")),
+            ).rstrip("/"),
+            model=os.getenv("CAMPUS_LLM_MODEL", str(preset.get("model", ""))).strip(),
             api_key=os.getenv("CAMPUS_LLM_API_KEY", "").strip(),
+            requires_api_key=bool(preset.get("requires_api_key", False)),
             timeout_seconds=float(os.getenv("CAMPUS_LLM_TIMEOUT", "30")),
         )
 
     @property
     def enabled(self) -> bool:
-        return bool(self.base_url and self.model)
+        return bool(
+            self.base_url
+            and self.model
+            and (self.api_key or not self.requires_api_key)
+        )
 
 
 class AnswerComposer(Protocol):
@@ -130,6 +152,17 @@ def _extract_json(content: str) -> Dict[str, object]:
     return value
 
 
+def _normalize_model_response(value: Dict[str, object]) -> Dict[str, object]:
+    """Normalize harmless provider shape drift without weakening grounding checks."""
+    normalized = dict(value)
+    unresolved = normalized.get("unresolved")
+    if unresolved is None:
+        normalized["unresolved"] = []
+    elif isinstance(unresolved, str):
+        normalized["unresolved"] = [unresolved] if unresolved.strip() else []
+    return normalized
+
+
 class OpenAICompatibleComposer:
     """Small dependency-free adapter for OpenAI-compatible chat endpoints."""
 
@@ -150,6 +183,7 @@ class OpenAICompatibleComposer:
         payload = json.dumps({
             "model": self.config.model,
             "temperature": 0.1,
+            "response_format": {"type": "json_object"},
             "messages": [
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
@@ -169,7 +203,7 @@ class OpenAICompatibleComposer:
         content = result["choices"][0]["message"]["content"]
         if isinstance(content, list):
             content = "".join(str(item.get("text", "")) for item in content if isinstance(item, dict))
-        return _extract_json(str(content))
+        return _normalize_model_response(_extract_json(str(content)))
 
 
 def validate_composition(
@@ -233,12 +267,17 @@ def configured_composer() -> Tuple[AnswerComposer, Dict[str, object]]:
         return OpenAICompatibleComposer(config), {
             "mode": "model",
             "adapter": "openai_compatible",
+            "provider": config.provider,
             "model": config.model,
             "base_url": config.base_url,
+            "credential_configured": bool(config.api_key),
         }
     return ExtractiveComposer(), {
         "mode": "fallback",
         "adapter": "extractive_fallback",
-        "model": None,
-        "base_url": None,
+        "provider": config.provider,
+        "model": config.model or None,
+        "base_url": config.base_url if config.model else None,
+        "credential_configured": bool(config.api_key),
+        "reason": "missing_api_key" if config.requires_api_key and not config.api_key else "model_not_configured",
     }

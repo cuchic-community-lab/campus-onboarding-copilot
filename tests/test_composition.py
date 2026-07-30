@@ -1,6 +1,14 @@
 import unittest
+from unittest.mock import patch
 
-from campus_copilot.composition import ExtractiveComposer, validate_composition
+from campus_copilot.composition import (
+    ExtractiveComposer,
+    OpenAICompatibleComposer,
+    ProviderConfig,
+    _normalize_model_response,
+    configured_composer,
+    validate_composition,
+)
 
 
 def packet(authority="peer_experience", can_generate=True):
@@ -23,6 +31,39 @@ def packet(authority="peer_experience", can_generate=True):
 
 
 class CompositionTest(unittest.TestCase):
+    def test_model_string_unresolved_is_normalized_without_touching_claims(self):
+        value = {
+            "answer": "学生经验提到四人间。[S1]",
+            "citations": ["S1"],
+            "claims": [{"text": "四人间", "evidence_ids": ["S1"], "certainty": "experience"}],
+            "unresolved": "研究生是否适用仍未知",
+        }
+        normalized = _normalize_model_response(value)
+        self.assertEqual(normalized["unresolved"], ["研究生是否适用仍未知"])
+        self.assertEqual(normalized["claims"], value["claims"])
+
+    def test_makers_preset_selects_gateway_and_default_model(self):
+        with patch.dict(
+            "os.environ",
+            {"CAMPUS_LLM_PROVIDER": "makers", "CAMPUS_LLM_API_KEY": "test-key"},
+            clear=True,
+        ):
+            config = ProviderConfig.from_env()
+            composer, status = configured_composer()
+        self.assertEqual(config.base_url, "https://ai-gateway.edgeone.link/v1")
+        self.assertEqual(config.model, "@makers/deepseek-v4-flash")
+        self.assertTrue(config.enabled)
+        self.assertIsInstance(composer, OpenAICompatibleComposer)
+        self.assertEqual(status["provider"], "makers")
+        self.assertTrue(status["credential_configured"])
+
+    def test_makers_without_key_stays_on_safe_fallback(self):
+        with patch.dict("os.environ", {"CAMPUS_LLM_PROVIDER": "makers"}, clear=True):
+            composer, status = configured_composer()
+        self.assertIsInstance(composer, ExtractiveComposer)
+        self.assertEqual(status["reason"], "missing_api_key")
+        self.assertFalse(status["credential_configured"])
+
     def test_extracts_peer_answer_with_label_and_citation(self):
         context = packet()
         result = ExtractiveComposer().generate(context)
