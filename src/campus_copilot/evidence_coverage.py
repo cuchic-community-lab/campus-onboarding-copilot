@@ -10,6 +10,14 @@ CREDENTIAL_WORDING_TERMS = (
     "字样", "标注", "写着", "印有", "显示", "版式", "样式", "一样吗", "区别",
     "没有不同", "完全一致", "没有区别", "相同",
 )
+VISUAL_COMMUNICATION_TERMS = ("视觉传达设计", "视觉传达", "视传")
+EXCLUSIVITY_TERMS = (
+    "只有", "仅有", "仅开设", "只开设", "没有普通", "无普通", "非中外合办",
+    "非中外合作办学", "普通版本", "普通专业",
+)
+EXHAUSTIVE_SCOPE_TERMS = (
+    "招生专业", "专业一览", "专业目录", "全部专业", "开设专业", "本科专业",
+)
 
 
 def _contains_any(text: str, terms: Iterable[str]) -> bool:
@@ -18,6 +26,11 @@ def _contains_any(text: str, terms: Iterable[str]) -> bool:
 
 
 def required_aspects(query: str, question_type: str) -> Set[str]:
+    if question_type == "program_offering":
+        aspects = {"program", "joint_program"}
+        if _contains_any(query, EXCLUSIVITY_TERMS):
+            aspects.add("exclusive_scope")
+        return aspects
     if question_type != "credential_wording":
         return set()
     aspects = {"credential"}
@@ -29,6 +42,15 @@ def required_aspects(query: str, question_type: str) -> Set[str]:
 
 
 def covered_aspects(text: str, question_type: str) -> Set[str]:
+    if question_type == "program_offering":
+        aspects: Set[str] = set()
+        if _contains_any(text, VISUAL_COMMUNICATION_TERMS):
+            aspects.add("program")
+        if _contains_any(text, JOINT_PROGRAM_TERMS):
+            aspects.add("joint_program")
+        if _contains_any(text, EXCLUSIVITY_TERMS) or _contains_any(text, EXHAUSTIVE_SCOPE_TERMS):
+            aspects.add("exclusive_scope")
+        return aspects
     if question_type != "credential_wording":
         return set()
     aspects: Set[str] = set()
@@ -57,8 +79,12 @@ def score_evidence_coverage(query: str, question_type: str, result: Dict[str, ob
             "direct_answer": True,
         }
     ratio = len(required.intersection(covered)) / len(required)
-    covers_object = "credential" in covered
-    direct_answer = covers_object and "wording" in covered
+    object_aspect = "program" if question_type == "program_offering" else "credential"
+    covers_object = object_aspect in covered
+    if question_type == "program_offering":
+        direct_answer = required.issubset(covered)
+    else:
+        direct_answer = covers_object and "wording" in covered
     return {
         "required_aspects": sorted(required),
         "covered_aspects": sorted(covered),
@@ -90,6 +116,10 @@ def rank_and_filter_evidence(
         if question_type == "credential_wording":
             covered = set(coverage["covered_aspects"])
             if not coverage["covers_question_object"] or not covered.intersection({"joint_program", "wording"}):
+                continue
+        if question_type == "program_offering":
+            covered = set(coverage["covered_aspects"])
+            if "program" not in covered or "joint_program" not in covered:
                 continue
         item["evidence_coverage"] = coverage
         ranked.append(item)

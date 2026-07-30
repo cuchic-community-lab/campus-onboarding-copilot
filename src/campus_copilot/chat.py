@@ -107,7 +107,7 @@ class GroundedChatService:
         enriched["web_search"] = {key: value for key, value in web_search.items() if key != "results"}
         web_results = list(web_search.get("results", []))
         question_type = str(plan["question_type"])
-        if not web_results and question_type != "credential_wording":
+        if not web_results and question_type not in {"credential_wording", "program_offering"}:
             return enriched
 
         if question_type in {"arrival_preparation", "institution_structure", "general_guidance"}:
@@ -130,9 +130,12 @@ class GroundedChatService:
             bool(item.get("evidence_coverage", {}).get("direct_answer"))
             for item in merged_results
         )
-        if question_type == "credential_wording" and not merged_results:
+        if question_type in {"credential_wording", "program_offering"} and not merged_results:
             enriched["answerability"] = "insufficient_question_coverage"
-            enriched["insufficient_reason"] = "evidence_does_not_cover_credential_object"
+            enriched["insufficient_reason"] = "evidence_does_not_cover_question_object"
+        elif question_type == "program_offering" and not has_direct_answer:
+            enriched["answerability"] = "supported_with_unresolved_exclusivity"
+            enriched["insufficient_reason"] = "no_scoped_official_source_proves_program_exclusivity"
         elif question_type == "credential_wording" and not has_direct_answer:
             enriched["answerability"] = "supported_with_unresolved_wording"
             enriched["insufficient_reason"] = "no_source_directly_confirms_certificate_wording"

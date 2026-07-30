@@ -116,6 +116,12 @@ class ExtractiveComposer:
                     "相似材料替你判断。学校官网或招生问答如果没有证书样张，最稳妥的是向招生办确认具体印刷内容。"
                 )
                 unresolved = ["缺少直接说明毕业证版式或印刷字样的证据"]
+            elif question_type == "program_offering":
+                answer = (
+                    "我这次没有找到同时覆盖视觉传达设计专业和完整招生范围的学校官方来源，所以不能把只提到"
+                    "“中外合作办学”的相似内容当成答案。专业介绍页只能确认该版本存在，不能单独证明没有普通版本。"
+                )
+                unresolved = ["缺少能证明专业开设范围的官方专业目录或明确说明"]
             elif context_packet.get("response_mode") == "insufficient_contextual_evidence":
                 answer = "我没有找到既符合当前追问对象、又能直接回答上一问题的材料，因此不能把其他相似内容当成答案。请补充对应人群的资料或向学校确认。"
                 unresolved = ["缺少同时匹配原问题主题和当前追问对象的证据"]
@@ -135,7 +141,7 @@ class ExtractiveComposer:
         ]
         evidence_limit = 3 if (
             eligible and eligible[0].get("chunk_type") == "structured_fact"
-        ) or question_type in {"arrival_preparation", "credential_wording"} else (
+        ) or question_type in {"arrival_preparation", "credential_wording", "program_offering"} else (
             2 if question_type == "institution_structure" else 1
         )
         evidence = eligible[:evidence_limit]
@@ -307,6 +313,49 @@ class ExtractiveComposer:
                 "claims": claims,
                 "unresolved": unresolved,
             }
+
+        if question_type == "program_offering":
+            direct = next((
+                item for item in evidence
+                if bool((item.get("evidence_coverage") or {}).get("direct_answer"))
+            ), None)
+            existence = next((
+                item for item in evidence
+                if {"program", "joint_program"}.issubset(set(
+                    (item.get("evidence_coverage") or {}).get("covered_aspects", [])
+                ))
+            ), None)
+            if direct:
+                evidence_id = str(direct["evidence_id"])
+                return {
+                    "answer": (
+                        "是的。就这份学校官方专业范围来看，视觉传达设计在海南国际学院以中外合作办学形式开设，"
+                        f"没有列出普通版本。 [{evidence_id}]"
+                    ),
+                    "citations": [evidence_id],
+                    "claims": [{
+                        "text": "视觉传达设计在所引官方范围内仅以中外合作办学形式开设",
+                        "evidence_ids": [evidence_id],
+                        "certainty": "official",
+                    }],
+                    "unresolved": [],
+                }
+            if existence:
+                evidence_id = str(existence["evidence_id"])
+                return {
+                    "answer": (
+                        "学校官网能确认海南国际学院有视觉传达设计（中外合作办学）专业。"
+                        "但这份专业介绍只能证明这个版本存在，不能单独证明没有非中外合作办学版本。"
+                        f"要回答“只有吗”，还需要学校完整的招生专业目录或明确说明。 [{evidence_id}]"
+                    ),
+                    "citations": [evidence_id],
+                    "claims": [{
+                        "text": "海南国际学院开设视觉传达设计（中外合作办学）专业",
+                        "evidence_ids": [evidence_id],
+                        "certainty": "official",
+                    }],
+                    "unresolved": ["现有来源不能证明是否不存在普通版本"],
+                }
 
         paragraphs: List[str] = []
         citations: List[str] = []
@@ -617,6 +666,17 @@ def validate_composition(
         }
         if makes_wording_claim and not direct_ids.intersection(str(item) for item in citations):
             errors.append("credential_wording_claim_without_direct_evidence")
+    if answer_plan.get("question_type") == "program_offering":
+        makes_exclusive_claim = bool(re.search(
+            r"(?:只有|仅有|仅开设|只开设|没有[^。]{0,16}(?:普通|非中外合作|非中外合办))",
+            visible,
+        ))
+        direct_ids = {
+            evidence_id for evidence_id, item in evidence.items()
+            if bool((item.get("evidence_coverage") or {}).get("direct_answer"))
+        }
+        if makes_exclusive_claim and not direct_ids.intersection(str(item) for item in citations):
+            errors.append("program_exclusivity_claim_without_scoped_evidence")
     peer_language = any(term in visible for term in ("学长学姐", "往届学生经验", "学生经验"))
     cited_peer = any(
         evidence.get(str(citation), {}).get("authority_tier") == "peer_experience"

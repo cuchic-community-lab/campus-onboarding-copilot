@@ -26,12 +26,21 @@ INSTITUTION_STRUCTURE_TERMS = (
 CREDENTIAL_TERMS = (
     "毕业证", "毕业证书", "学位证", "学位证书", "证书字样", "双证", "学信网",
 )
+PROGRAM_TERMS = ("视觉传达设计", "视觉传达", "视传")
+PROGRAM_MODALITY_TERMS = (
+    "中外合办", "中外合作办学", "非中外合办", "非中外合作办学", "普通版本",
+    "普通专业", "只有", "仅有", "只开设", "有没有",
+)
 
 
 def classify_question(query: str) -> str:
     compact = query.replace(" ", "").lower()
     if any(term in compact for term in CREDENTIAL_TERMS):
         return "credential_wording"
+    if any(term in compact for term in PROGRAM_TERMS) and any(
+        term in compact for term in PROGRAM_MODALITY_TERMS
+    ):
+        return "program_offering"
     if any(term in compact for term in ARRIVAL_PREPARATION_TERMS):
         return "arrival_preparation"
     if any(term in compact for term in INSTITUTION_STRUCTURE_TERMS):
@@ -59,10 +68,13 @@ def build_answer_plan(query: str, answerability: str) -> Dict[str, object]:
     requires_web_enrichment = question_type in {
         "arrival_preparation", "credential_wording", "current_official",
         "institution_structure", "general_guidance",
+        "program_offering",
     }
     if question_type in {"arrival_preparation", "credential_wording"}:
         fallback_route = "official_and_public_web_discovery"
     elif question_type == "institution_structure":
+        fallback_route = "official_web_discovery"
+    elif question_type == "program_offering":
         fallback_route = "official_web_discovery"
     elif question_type == "current_official":
         fallback_route = "official_web_discovery"
@@ -89,6 +101,12 @@ def build_answer_plan(query: str, answerability: str) -> Dict[str, object]:
             "Prefer a direct official FAQ or certificate sample. An official page that only says which "
             "degree is awarded cannot prove what is or is not printed on the certificate. Use a public "
             "FAQ only as a clearly labeled reference and preserve the remaining verification boundary."
+        ),
+        "program_offering": (
+            "Identify the canonical program and its delivery mode. Treat a program detail page as "
+            "proof that the listed version exists, not proof that no other version exists. Answer an "
+            "exclusivity question directly only from a scoped official program catalog or an explicit "
+            "official statement; otherwise preserve that verification boundary."
         ),
         "historical_outcome": (
             "Answer with the observed cohort result first. Explicitly distinguish an observed "

@@ -24,6 +24,7 @@ GENERATABLE_MODES = {
     "public_web_supported",
     "web_supported_mixed",
     "supported_with_unresolved_wording",
+    "supported_with_unresolved_exclusivity",
 }
 
 

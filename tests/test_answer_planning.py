@@ -49,6 +49,12 @@ class AnswerPlanningTest(unittest.TestCase):
         self.assertEqual(plan["fallback_route"], "official_and_public_web_discovery")
         self.assertTrue(plan["requires_web_enrichment"])
 
+    def test_visual_communication_modality_forces_official_web_discovery(self):
+        plan = build_answer_plan("视传只有中外合办有嘛", "experience_only")
+        self.assertEqual(plan["question_type"], "program_offering")
+        self.assertEqual(plan["fallback_route"], "official_web_discovery")
+        self.assertTrue(plan["requires_web_enrichment"])
+
 
 if __name__ == "__main__":
     unittest.main()

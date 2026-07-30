@@ -17,6 +17,7 @@ from .search_discovery import (
     SearchDiscoveryProvider,
     configured_search_discovery,
 )
+from .retrieval import expand_query
 
 
 SOURCE_REGISTRY_PATH = PROJECT_ROOT / "config" / "web_sources.json"
@@ -285,11 +286,12 @@ class CuratedLiveWebRetriever:
 
     def search(self, query: str, routes: Iterable[str], top_k: int = 4) -> Dict[str, object]:
         requested_routes = list(dict.fromkeys(str(route) for route in routes))
+        normalized_query = expand_query(query)
         candidates: List[Dict[str, object]] = []
         for source in self.sources:
             if source.get("route") not in requested_routes:
                 continue
-            score = self._matches(query, source.get("query_terms", []))
+            score = self._matches(normalized_query, source.get("query_terms", []))
             if score <= 0:
                 continue
             candidate = dict(source)
@@ -304,10 +306,10 @@ class CuratedLiveWebRetriever:
         # one of several simultaneous TLS handshakes to Chinese public sites.
         for source in candidates:
             try:
-                results.append(self._fetch_source(source, query))
+                results.append(self._fetch_source(source, normalized_query))
             except Exception as exc:
                 errors.append(f"{source['source_id']}:{type(exc).__name__}")
-        discovery = self.discovery_provider.search(query, requested_routes, top_k)
+        discovery = self.discovery_provider.search(normalized_query, requested_routes, top_k)
         errors.extend(
             f"discovery:{error}" for error in discovery.get("errors", [])
         )

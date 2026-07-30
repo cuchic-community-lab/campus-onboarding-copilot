@@ -105,6 +105,22 @@ class CredentialWebRetriever(FakeWebRetriever):
         }
 
 
+class ProgramOfferingWebRetriever(FakeWebRetriever):
+    def search(self, query, routes, top_k=4):
+        return {
+            "executed": True,
+            "provider": self.name,
+            "status": "success",
+            "routes": list(routes),
+            "results": [web_result(
+                "visual-communication-program",
+                "official_web",
+                "视觉传达设计（中外合作办学）专业介绍。",
+            )],
+            "errors": [],
+        }
+
+
 class ChatTest(unittest.TestCase):
     def test_insufficient_evidence_bypasses_model_composer(self):
         retriever = FakeRetriever()
@@ -242,6 +258,30 @@ class ChatTest(unittest.TestCase):
         self.assertEqual(result["answerability"], "supported_with_unresolved_wording")
         self.assertIn("不能仅凭", result["answer"])
         self.assertIn("单独不能证明", result["answer"])
+
+    def test_visual_communication_question_rejects_unrelated_local_faq(self):
+        retriever = FakeRetriever()
+
+        def wrong_local_search(query, top_k, profile):
+            result = FakeRetriever().search(query, top_k, profile)
+            result["results"][0].update({
+                "title": "中外合办校园文化问答",
+                "text": "英国校园文化与APA7格式介绍。",
+                "score": 99.0,
+            })
+            return result
+
+        retriever.search = wrong_local_search
+        result = GroundedChatService(
+            retriever,
+            composer=ExtractiveComposer(),
+            web_retriever=ProgramOfferingWebRetriever(),
+        ).ask("视传只有中外合办有嘛")
+        titles = [item["title"] for item in result["evidence"]]
+        self.assertNotIn("中外合办校园文化问答", titles)
+        self.assertIn("视觉传达设计（中外合作办学）", result["answer"])
+        self.assertIn("不能单独证明", result["answer"])
+        self.assertNotIn("APA7", result["answer"])
 
 
 if __name__ == "__main__":
