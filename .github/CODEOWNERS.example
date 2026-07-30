@@ -1,0 +1,11 @@
+# Rename this file to CODEOWNERS after replacing the second placeholder with
+# Zihuanana's confirmed GitHub username.
+
+* @RellFu @REPLACE_WITH_ZIHUANANA_USERNAME
+
+/src/campus_copilot/retrieval.py @RellFu
+/src/campus_copilot/composition.py @RellFu
+/evaluation/ @RellFu
+
+/src/campus_copilot/source_policy.py @RellFu @REPLACE_WITH_ZIHUANANA_USERNAME
+/docs/COLLABORATION.md @RellFu @REPLACE_WITH_ZIHUANANA_USERNAME

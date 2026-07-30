@@ -1,0 +1,28 @@
+name: Feature proposal
+description: Propose a product, knowledge-management, retrieval, or infrastructure improvement.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: user_problem
+    attributes:
+      label: User problem
+      description: Describe the student or maintainer need before proposing technology.
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome and acceptance criteria
+    validations:
+      required: true
+  - type: textarea
+    id: tradeoffs
+    attributes:
+      label: Evidence, alternatives, and tradeoffs
+  - type: checkboxes
+    id: ownership
+    attributes:
+      label: Ownership impact
+      options:
+        - label: This changes source content, provenance, privacy, licensing, or public-release behavior.

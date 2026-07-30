@@ -1,0 +1,30 @@
+name: Bug report
+description: Report a reproducible retrieval, grounding, UI, or ingestion defect.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Observed behavior
+      description: Include the exact question and answer, with secrets and personal data removed.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Relevant source or evidence
+      description: Link the public source and state its year, cohort, and authority type if known.
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety check
+      options:
+        - label: I removed API keys, student identifiers, and private group content.
+          required: true

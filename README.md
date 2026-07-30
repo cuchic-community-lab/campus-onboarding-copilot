@@ -4,6 +4,20 @@ A runnable, trust-aware grounded-chat prototype for incoming students. The
 included CUCHIC adapter uses the public corpus at
 `https://hic.zihuanana.top/` as a demo instance.
 
+## Origin and collaboration
+
+The original HIC onboarding knowledge base and public source site were created
+and are maintained by **Zihuanana**. **Pengwei Fu** designed and implemented
+the retrieval, grounded-generation, evaluation, and cloud-model integration
+layers in this repository. New work is intended to be developed through issues,
+reviewed pull requests, and an explicit shared-maintenance agreement.
+
+This is an independent student-built project. It is not an official university
+service, and retrieved policies must still be checked against the latest school
+notice. Source attribution does not by itself grant a license to redistribute
+the underlying documents; code and content licensing will be documented
+separately before a public release.
+
 The system separates retrieval from generation. It finds evidence, preserves
 provenance, recognizes unofficial experience, and abstains when evidence is
 incomplete. A configurable model may compose the final answer, but it never
@@ -59,6 +73,7 @@ make build      # normalize, chunk, and build SQLite indexes
 make audit      # inspect authority, parsing, privacy, and freshness gaps
 make evaluate   # run labeled retrieval and answerability checks
 make evaluate-chat # check citation, refusal, and peer-label contracts
+make publication-audit # reject tracked secrets and generated/private corpus files
 make demo       # run an uncertainty-sensitive example query
 make serve      # open http://127.0.0.1:8000
 ```
@@ -156,3 +171,11 @@ effective dates.
 `evaluate-chat` is a contract check, not a claim that answer quality is solved.
 Human-labeled completeness, usefulness, temporal conflicts, and held-out
 questions remain required before reporting a production accuracy metric.
+
+## Contributing and release status
+
+The repository is being prepared for shared maintenance. See
+[`CONTRIBUTING.md`](CONTRIBUTING.md) for the branch/PR workflow and
+[`docs/COLLABORATION.md`](docs/COLLABORATION.md) for ownership boundaries.
+Until the collaborators confirm code and content licenses, treat the repository
+as private and do not redistribute the synchronized source corpus.

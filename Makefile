@@ -2,7 +2,7 @@ PYTHON ?= $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
 -include .env.local
 export
 
-.PHONY: sync build query chat serve makers-check audit evaluate evaluate-chat test demo
+.PHONY: sync build query chat serve makers-check audit evaluate evaluate-chat publication-audit test demo
 
 sync:
 	PYTHONPATH=src $(PYTHON) -m campus_copilot.cli sync --all-files
@@ -32,6 +32,9 @@ evaluate:
 
 evaluate-chat:
 	PYTHONPATH=src $(PYTHON) -m campus_copilot.cli evaluate-chat
+
+publication-audit:
+	$(PYTHON) scripts/publication_audit.py
 
 test:
 	PYTHONPATH=src $(PYTHON) -m unittest discover -s tests -v
