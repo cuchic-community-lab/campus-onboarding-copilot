@@ -17,11 +17,12 @@ class FrontendContractTest(unittest.TestCase):
             "/api/chat",
             "/api/session/reset",
             'id="libraryContent"',
-            'id="chatPanel"',
+            'id="chatMessages"',
+            'id="libraryDrawer"',
         ):
             self.assertIn(contract, self.html)
 
-    def test_mobile_sheet_has_direct_interruptible_gesture_primitives(self):
+    def test_mobile_library_drawer_has_direct_interruptible_gesture_primitives(self):
         for primitive in (
             "setPointerCapture",
             "pointerdown",
@@ -29,8 +30,29 @@ class FrontendContractTest(unittest.TestCase):
             "requestAnimationFrame",
             "rubberband",
             "project(velocity",
+            "animateDrawer",
         ):
             self.assertIn(primitive, self.html)
+
+    def test_chat_first_shell_replaces_the_floating_panel_and_filter_toolbar(self):
+        for contract in (
+            'class="app-shell"',
+            'class="sidebar"',
+            'class="workspace"',
+            'class="composer-wrap"',
+            'id="openDrawer"',
+            'id="newChat"',
+            "嗨，我们从哪开始？",
+        ):
+            self.assertIn(contract, self.html)
+        for retired_control in (
+            'id="chatLauncher"',
+            'id="chatPanel"',
+            'id="resourcesTab"',
+            'id="questionsTab"',
+            'id="tags"',
+        ):
+            self.assertNotIn(retired_control, self.html)
 
     def test_accessibility_preferences_have_explicit_fallbacks(self):
         for preference in (
@@ -39,6 +61,7 @@ class FrontendContractTest(unittest.TestCase):
             "prefers-contrast:more",
             "aria-hidden",
             "aria-modal",
+            "aria-expanded",
             ":focus-visible",
         ):
             self.assertIn(preference, self.html)
@@ -61,6 +84,12 @@ class FrontendContractTest(unittest.TestCase):
         self.assertIn("updateInputGuide(true)", self.html)
         self.assertIn("发送示例问题：", self.html)
         self.assertIn("输入为空时可直接发送示例", self.html)
+
+    def test_library_search_includes_files_links_and_questions(self):
+        self.assertIn("library.files.filter", self.html)
+        self.assertIn("library.links.filter", self.html)
+        self.assertIn("library.questions.filter", self.html)
+        self.assertIn('class="library-item question-item"', self.html)
 
 
 if __name__ == "__main__":
