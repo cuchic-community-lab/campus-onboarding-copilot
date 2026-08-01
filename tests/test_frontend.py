@@ -55,6 +55,13 @@ class FrontendContractTest(unittest.TestCase):
         self.assertIn("location.protocol==='file:'", self.html)
         self.assertIn("location.replace('http://127.0.0.1:8767/')", self.html)
 
+    def test_empty_composer_can_send_and_advance_a_guided_question(self):
+        self.assertIn("const guidedQuestions=", self.html)
+        self.assertIn("const q=input.value.trim()||guidedQuestion()", self.html)
+        self.assertIn("updateInputGuide(true)", self.html)
+        self.assertIn("发送示例问题：", self.html)
+        self.assertIn("输入为空时可直接发送示例", self.html)
+
 
 if __name__ == "__main__":
     unittest.main()
