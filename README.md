@@ -31,6 +31,14 @@ tokens out of the visible prose; and show only the sources actually used below
 the answer. A historical outcome such as `14 of 85 students` is never silently
 promoted into a permanent official quota.
 
+The product surface is a mobile-first fusion of the original student resource
+library and the grounded assistant. Files, useful links, tags, and all original
+student Q&A remain directly browsable and searchable. The Copilot opens as a
+bottom sheet on phones and a floating panel on larger screens, so asking a
+question never replaces access to the source library. Multi-turn follow-up,
+source provenance, unresolved boundaries, and human handoff are rendered in the
+same panel.
+
 ## Why this is an indexed knowledge base
 
 The durable layer is SQLite, not a vector database:
@@ -107,10 +115,17 @@ The lightweight standard-library HTTP server exposes:
 
 - `GET /api/health`
 - `GET /api/corpus/stats`
+- `GET /api/library`
+- `GET /files/<manifest-listed filename>`
 - `POST /api/search`
 - `POST /api/context`
 - `POST /api/chat`
 - `POST /api/session/reset`
+
+`/api/library` is a read-only projection of the synchronized original source
+manifest and student Q&A. It omits administrative fields. `/files/` serves only
+visible, manifest-listed local attachments and rejects path traversal; run
+`make sync` first when the raw source files are not present locally.
 
 Example:
 

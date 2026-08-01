@@ -1,9 +1,10 @@
 import json
+import mimetypes
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Dict
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 from .config import DB_PATH, PROJECT_ROOT
 from .chat import GroundedChatService
@@ -11,6 +12,7 @@ from .context_builder import build_context_packet
 from .retrieval import HybridRetriever
 from .service import corpus_stats
 from .web_retrieval import configured_web_retriever
+from .library import library_payload, resolve_library_file
 
 
 WEB_ROOT = PROJECT_ROOT / "web"
@@ -45,6 +47,24 @@ class AppHandler(BaseHTTPRequestHandler):
             return
         if path == "/api/corpus/stats":
             self._json(corpus_stats())
+            return
+        if path == "/api/library":
+            self._json(library_payload())
+            return
+        if path.startswith("/files/"):
+            file_path = resolve_library_file(path.removeprefix("/files/"))
+            if file_path is None:
+                self._json({"error": "not_found"}, 404)
+                return
+            body = file_path.read_bytes()
+            content_type = mimetypes.guess_type(file_path.name)[0] or "application/octet-stream"
+            self.send_response(200)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Disposition", "inline; filename*=UTF-8''" + quote(file_path.name))
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
             return
         if path in {"/", "/index.html"}:
             body = (WEB_ROOT / "index.html").read_bytes()

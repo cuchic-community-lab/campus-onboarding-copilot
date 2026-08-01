@@ -2,42 +2,155 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>新生入学 Copilot</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#f6f7f2">
+  <title>中传海南一站通</title>
   <style>
-    :root{--ink:#13211b;--muted:#647069;--paper:#f5f4ed;--card:#fffdf8;--line:#d8ded7;--green:#1c6b4a;--soft:#e9f1eb;--amber:#9b6513;--red:#a43e35}
-    *{box-sizing:border-box}body{margin:0;color:var(--ink);background:linear-gradient(145deg,#eef4ec,#f8f1e7);font:15px/1.65 ui-sans-serif,system-ui,-apple-system,"PingFang SC",sans-serif}
-    header{padding:30px max(20px,calc((100vw - 980px)/2));border-bottom:1px solid var(--line);background:rgba(255,253,248,.78);backdrop-filter:blur(14px);position:sticky;top:0;z-index:2}
-    .head{display:flex;justify-content:space-between;gap:18px;align-items:center}.brand h1{margin:0;font:700 clamp(25px,4vw,40px)/1.15 ui-serif,"Songti SC",serif;letter-spacing:-.035em}.brand p{margin:7px 0 0;color:var(--muted)}
-    button{border:0;border-radius:12px;padding:11px 18px;color:white;background:var(--green);font-weight:700;cursor:pointer}.secondary{color:var(--green);background:var(--soft);white-space:nowrap}
-    main{max-width:980px;margin:0 auto;padding:28px 20px 130px}.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:22px}.pill{border:1px solid var(--line);border-radius:999px;padding:4px 10px;background:rgba(255,255,255,.65);color:var(--muted);font-size:12px}
-    #messages{display:grid;gap:18px}.message{max-width:86%;padding:16px 18px;border-radius:18px;box-shadow:0 10px 35px rgba(55,64,48,.05)}.user{justify-self:end;background:var(--green);color:white;border-bottom-right-radius:5px}.assistant{justify-self:start;background:var(--card);border:1px solid var(--line);border-bottom-left-radius:5px}.answer{white-space:pre-wrap}.label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:5px}.user .label{color:#cce2d5}
-    .unresolved,.provenance,.handoff{margin:13px 0 0;padding:10px 12px;border-left:3px solid var(--amber);background:#fff6e7;color:#6d4b16;font-size:13px}.provenance{border-left-color:#315b92;background:#eef5ff;color:#294d78}.handoff{border-left-color:var(--green);background:#eef7f1;color:#315a3d}.evidence{margin-top:14px;border-top:1px solid var(--line);padding-top:10px}.evidence>details>summary{cursor:pointer;color:var(--green);font-weight:650}.source{margin:10px 0;padding:12px;border-radius:6px;background:#f3f4ee}.source>summary{cursor:pointer}.source p{margin:9px 0;white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}.row{display:flex;gap:7px;flex-wrap:wrap;color:var(--muted);font-size:11px}.official_policy,.official_guidance,.official_web{color:var(--green)}.peer_experience{color:var(--amber)}.public_web{color:#315b92}.unverified{color:var(--red)}a{color:var(--green)}
-    .empty{text-align:center;color:var(--muted);padding:70px 15px}.composer{font-size:11px;color:var(--muted);margin-top:10px}.warning{color:var(--amber)}
-    .dock{position:fixed;left:0;right:0;bottom:0;padding:16px 20px 22px;background:linear-gradient(transparent,rgba(245,244,237,.96) 22%);z-index:3}.inputbar{max-width:980px;margin:0 auto;display:grid;grid-template-columns:1fr auto;gap:10px;padding:12px;background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:0 18px 55px rgba(55,64,48,.16)}input{border:0;outline:0;background:transparent;font:inherit;font-size:16px;padding:8px 10px;min-width:0}
-    @media(max-width:620px){header{position:static}.head{align-items:flex-start}.brand p{font-size:13px}.message{max-width:95%}.inputbar{grid-template-columns:1fr}.inputbar button{height:44px}}
+    :root{
+      --ink:#17231e;--muted:#66716c;--faint:#8e9792;--canvas:#f6f7f2;--surface:#fff;
+      --line:#dde3de;--green:#176b4b;--green-deep:#0d5137;--green-soft:#e8f3ed;
+      --blue:#315f9b;--blue-soft:#eef5ff;--amber:#986018;--amber-soft:#fff6e7;
+      --red:#a43e35;--shadow:0 18px 50px rgba(32,54,43,.12);--radius:18px;
+    }
+    *{box-sizing:border-box}
+    html{scroll-behavior:smooth}
+    body{margin:0;min-height:100dvh;color:var(--ink);background:var(--canvas);font:15px/1.6 ui-sans-serif,system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif}
+    button,input,textarea{font:inherit}
+    button{cursor:pointer}
+    a{color:inherit}
+    .site-header{position:sticky;top:0;z-index:20;border-bottom:1px solid rgba(221,227,222,.9);background:rgba(246,247,242,.88);backdrop-filter:blur(16px)}
+    .header-inner{max-width:1120px;margin:auto;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .brand{display:flex;align-items:center;gap:10px;min-width:0}
+    .mark{width:38px;height:38px;display:grid;place-items:center;border-radius:12px;color:#fff;background:linear-gradient(145deg,var(--green),#2b8b64);box-shadow:0 7px 20px rgba(23,107,75,.23);font:800 17px/1 ui-serif,"Songti SC",serif}
+    .brand-copy{min-width:0}.brand-title{font-weight:800;font-size:16px;white-space:nowrap}.brand-subtitle{color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .ask-top{border:0;border-radius:999px;padding:9px 13px;background:var(--green);color:#fff;font-weight:750;display:flex;align-items:center;gap:6px;white-space:nowrap}
+    .ask-top svg{width:16px;height:16px}
+    main{max-width:1120px;margin:auto;padding:20px 16px 120px}
+    .hero{border:1px solid #d8e2da;border-radius:24px;overflow:hidden;background:linear-gradient(135deg,#fdfcf6 0%,#edf6ef 100%);padding:24px;position:relative}
+    .hero:after{content:"";position:absolute;width:190px;height:190px;border-radius:50%;right:-80px;top:-95px;background:rgba(23,107,75,.08)}
+    .eyebrow{color:var(--green);font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+    h1{max-width:700px;margin:9px 0 8px;font:750 clamp(29px,7vw,50px)/1.08 ui-serif,"Songti SC",serif;letter-spacing:-.035em}
+    .hero p{max-width:680px;margin:0;color:var(--muted)}
+    .stats{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}.stat{padding:7px 11px;border:1px solid rgba(23,107,75,.15);border-radius:999px;background:rgba(255,255,255,.72);font-size:12px;color:var(--muted)}.stat strong{color:var(--ink)}
+    .notice{margin:14px 2px 0;color:var(--muted);font-size:12px;display:flex;gap:7px;align-items:flex-start}.notice svg{width:15px;flex:0 0 auto;margin-top:2px;color:var(--amber)}
+    .workspace{margin-top:24px}
+    .controls{display:grid;gap:12px}
+    .tabs{display:grid;grid-template-columns:1fr 1fr;padding:4px;border:1px solid var(--line);background:#edf0ec;border-radius:14px}
+    .tab{border:0;background:transparent;color:var(--muted);border-radius:10px;padding:10px;font-weight:750}.tab.active{background:var(--surface);color:var(--ink);box-shadow:0 2px 10px rgba(30,50,40,.08)}
+    .search{position:relative}.search svg{position:absolute;left:14px;top:50%;transform:translateY(-50%);width:18px;color:var(--muted)}
+    .search input{width:100%;height:48px;padding:0 42px;border:1px solid var(--line);border-radius:14px;background:var(--surface);outline:none;color:var(--ink);font-size:16px}.search input:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(23,107,75,.12)}
+    .clear-search{display:none;position:absolute;right:8px;top:7px;width:34px;height:34px;border:0;background:transparent;color:var(--muted);border-radius:50%}
+    .tags{display:flex;gap:7px;overflow:auto;padding:1px 1px 6px;scrollbar-width:none}.tags::-webkit-scrollbar{display:none}
+    .tag{flex:0 0 auto;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--muted);padding:6px 11px;font-size:12px}.tag.active{border-color:var(--green);background:var(--green-soft);color:var(--green);font-weight:750}
+    .section-head{display:flex;align-items:end;justify-content:space-between;margin:24px 1px 11px}.section-head h2{margin:0;font-size:18px}.result-count{color:var(--muted);font-size:12px}
+    .resource-grid{display:grid;gap:10px}
+    .resource{display:grid;grid-template-columns:42px 1fr auto;gap:11px;align-items:center;text-decoration:none;padding:14px;border:1px solid var(--line);border-radius:16px;background:var(--surface);transition:transform .15s,border-color .15s,box-shadow .15s;min-width:0}
+    .resource:active{transform:scale(.99)}.resource.pinned{border-color:#eed8a1;background:linear-gradient(100deg,#fffaf0,#fff)}
+    .file-icon{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;font-size:12px;font-weight:850;text-transform:uppercase;background:var(--green-soft);color:var(--green)}
+    .file-icon.pdf{background:#fff0ee;color:#b74b40}.file-icon.word{background:#eef5ff;color:#315f9b}.file-icon.excel{background:#eaf6ee;color:#287448}.file-icon.image{background:#fff7df;color:#936412}.file-icon.link{background:#f0edff;color:#6548a5}
+    .resource-info{min-width:0}.resource-title{font-weight:750;line-height:1.42;word-break:break-word}.pin{color:var(--amber);font-size:10px;margin-left:5px;white-space:nowrap}.resource-desc{margin-top:3px;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.resource-meta{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px;color:var(--faint);font-size:10px}.mini-tag{padding:1px 6px;background:#f1f3f1;border-radius:999px;color:var(--muted)}
+    .open-icon{width:30px;height:30px;display:grid;place-items:center;color:var(--green)}.open-icon svg{width:17px}
+    .qa-list{display:grid;gap:9px}.qa-group-title{margin:20px 2px 8px;color:var(--green);font-size:13px;font-weight:800}.qa-item{border:1px solid var(--line);border-radius:15px;background:var(--surface);overflow:hidden}.qa-item summary{list-style:none;padding:14px 44px 14px 15px;font-weight:750;line-height:1.45;cursor:pointer;position:relative}.qa-item summary::-webkit-details-marker{display:none}.qa-item summary:after{content:"＋";position:absolute;right:15px;top:12px;color:var(--green);font-size:19px}.qa-item[open] summary:after{content:"−"}.qa-answer{border-top:1px solid var(--line);padding:13px 15px 15px;color:#46524c;font-size:14px;white-space:pre-line}.qa-answer strong{color:var(--ink)}
+    .empty{padding:56px 18px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:16px}.empty strong{display:block;color:var(--ink);font-size:16px;margin-bottom:4px}
+    .loading{display:grid;place-items:center;padding:70px 0;color:var(--muted)}
+
+    .chat-launcher{position:fixed;z-index:45;right:16px;bottom:max(16px,env(safe-area-inset-bottom));border:0;border-radius:999px;background:var(--green);color:#fff;padding:12px 16px;box-shadow:0 15px 38px rgba(13,81,55,.32);display:flex;align-items:center;gap:9px;font-weight:800}.chat-launcher svg{width:21px}.chat-launcher.hidden{display:none}
+    .chat-backdrop{position:fixed;inset:0;z-index:40;background:rgba(12,24,18,.34);opacity:0;visibility:hidden;transition:.2s}.chat-backdrop.show{opacity:1;visibility:visible}
+    .chat-panel{position:fixed;z-index:50;left:0;right:0;bottom:0;height:min(82dvh,720px);display:grid;grid-template-rows:auto 1fr auto;background:var(--surface);border-radius:22px 22px 0 0;box-shadow:0 -20px 60px rgba(17,35,26,.22);transform:translateY(105%);transition:transform .24s ease;overflow:hidden;padding-bottom:env(safe-area-inset-bottom)}.chat-panel.open{transform:none}
+    .chat-head{padding:12px 12px 11px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.96)}
+    .bot-avatar{width:36px;height:36px;display:grid;place-items:center;border-radius:12px;color:#fff;background:var(--green);font-weight:850}.chat-title{flex:1;min-width:0}.chat-title strong{display:block}.chat-status{display:flex;align-items:center;gap:5px;color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.status-dot{width:6px;height:6px;border-radius:50%;background:#35a36f}
+    .icon-btn{width:34px;height:34px;border:0;border-radius:10px;background:#f1f4f1;color:var(--muted);display:grid;place-items:center}.icon-btn svg{width:17px}.drag-handle{position:absolute;top:5px;left:50%;transform:translateX(-50%);width:34px;height:4px;border-radius:9px;background:#dce1dd}
+    .chat-messages{padding:17px 14px;overflow-y:auto;overscroll-behavior:contain;background:linear-gradient(#fbfcfa,#f7f9f6);display:flex;flex-direction:column;gap:13px}
+    .chat-message{max-width:91%;border-radius:16px;padding:11px 13px;box-shadow:0 5px 18px rgba(30,48,39,.05)}.chat-message.user{align-self:flex-end;color:#fff;background:var(--green);border-bottom-right-radius:5px;white-space:pre-wrap}.chat-message.assistant{align-self:flex-start;border:1px solid var(--line);background:#fff;border-bottom-left-radius:5px}.assistant-answer{white-space:pre-wrap}.message-label{color:var(--muted);font-size:10px;margin-bottom:4px;font-weight:750}.user .message-label{color:#cce3d6}
+    .suggestions{display:flex;flex-wrap:wrap;gap:7px;margin-top:11px}.suggestion{border:1px solid #cde0d4;border-radius:999px;background:var(--green-soft);color:var(--green);padding:6px 9px;font-size:11px;text-align:left}
+    .answer-note{margin-top:10px;padding:8px 9px;border-left:3px solid var(--blue);background:var(--blue-soft);color:#294d78;font-size:11px;border-radius:3px}.answer-note.warn{border-color:var(--amber);background:var(--amber-soft);color:#6d4b16}.answer-note.handoff{border-color:var(--green);background:#eef7f1;color:#315a3d}
+    .sources{margin-top:10px;border-top:1px solid var(--line);padding-top:8px}.sources>summary{cursor:pointer;color:var(--green);font-size:12px;font-weight:800}.source{margin-top:7px;padding:9px;border-radius:10px;background:#f3f5f2}.source-title{font-size:11px;font-weight:750}.source-meta{color:var(--muted);font-size:10px;margin-top:3px}.source a{display:inline-block;margin-top:5px;color:var(--green);font-size:10px}
+    .typing{display:inline-flex;gap:4px;align-items:center}.typing i{width:5px;height:5px;border-radius:50%;background:#85918b;animation:pulse 1s infinite}.typing i:nth-child(2){animation-delay:.15s}.typing i:nth-child(3){animation-delay:.3s}@keyframes pulse{0%,70%,100%{opacity:.28;transform:translateY(0)}35%{opacity:1;transform:translateY(-3px)}}
+    .chat-compose{padding:10px 12px 11px;border-top:1px solid var(--line);background:#fff}.compose-box{display:grid;grid-template-columns:1fr 40px;gap:7px;align-items:end;border:1px solid var(--line);border-radius:15px;padding:7px;background:#fafbf9}.compose-box:focus-within{border-color:var(--green);box-shadow:0 0 0 3px rgba(23,107,75,.1)}textarea{width:100%;min-height:36px;max-height:110px;resize:none;border:0;outline:0;background:transparent;padding:7px;font-size:16px;line-height:1.4;color:var(--ink)}.send{width:40px;height:40px;border:0;border-radius:11px;background:var(--green);color:#fff;display:grid;place-items:center}.send:disabled{opacity:.45}.send svg{width:18px}.privacy{margin-top:6px;text-align:center;color:var(--faint);font-size:9px}
+
+    @media(min-width:720px){
+      .header-inner{padding:15px 22px}.brand-title{font-size:18px}.brand-subtitle{font-size:12px}
+      main{padding:34px 22px 130px}.hero{padding:40px}.controls{grid-template-columns:270px 1fr;align-items:center}.tags{grid-column:1/-1}.resource-grid{grid-template-columns:1fr 1fr}.resource{padding:16px}
+      .chat-backdrop{display:none}.chat-panel{left:auto;right:22px;bottom:22px;width:410px;height:min(700px,calc(100dvh - 44px));border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow);transform:translateY(30px) scale(.97);opacity:0;visibility:hidden}.chat-panel.open{transform:none;opacity:1;visibility:visible}.drag-handle{display:none}.chat-launcher{right:22px;bottom:22px}
+    }
+    @media(hover:hover){.resource:hover{transform:translateY(-2px);border-color:#bdcec3;box-shadow:0 10px 26px rgba(30,50,40,.08)}.tag:hover{border-color:#bdcec3}.ask-top:hover,.chat-launcher:hover,.send:hover{background:var(--green-deep)}}
+    @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
   </style>
 </head>
 <body>
-  <header><div class="head"><div class="brand"><h1>新生入学 Copilot</h1><p>像一位有来源意识的学生大使，先回答问题，再把参考依据交给你。</p></div><button class="secondary" id="reset">新对话</button></div></header>
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="brand"><div class="mark">传</div><div class="brand-copy"><div class="brand-title">中传海南一站通</div><div class="brand-subtitle">学生共建 · 入学资料与经验</div></div></div>
+      <button class="ask-top" data-open-chat aria-label="打开新生助手"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/></svg>问问助手</button>
+    </div>
+  </header>
   <main>
-    <div class="meta" id="meta"><span class="pill">正在连接知识库…</span></div>
-    <section id="messages"><div class="empty">试着问：开学报到要带些什么？我去哪里查看依据？</div></section>
+    <section class="hero">
+      <div class="eyebrow">CUC Hainan · Student Library</div>
+      <h1>新生要找的资料，<br>尽量都放在这里。</h1>
+      <p>先自己翻资料，也可以随时叫出右下角的 Copilot。它会结合资料库回答，并把参考来源和不确定的地方告诉你。</p>
+      <div class="stats" id="stats"><span class="stat">正在读取资料库…</span></div>
+    </section>
+    <div class="notice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v5m0 3h.01"/></svg><span id="disclaimer">学生自建资料库，具体安排请以学校最新通知为准。</span></div>
+
+    <section class="workspace">
+      <div class="controls">
+        <div class="tabs" role="tablist"><button class="tab active" id="resourcesTab" role="tab" aria-selected="true">资料与入口</button><button class="tab" id="questionsTab" role="tab" aria-selected="false">百问百答</button></div>
+        <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="librarySearch" type="search" placeholder="搜索文件、标签或问题" autocomplete="off"><button class="clear-search" id="clearSearch" aria-label="清空搜索">×</button></div>
+        <div class="tags" id="tags" aria-label="资料标签"></div>
+      </div>
+      <div class="section-head"><h2 id="sectionTitle">资料与常用入口</h2><span class="result-count" id="resultCount"></span></div>
+      <div id="libraryContent" class="loading">资料正在整理中…</div>
+    </section>
   </main>
-  <div class="dock"><div class="inputbar"><input id="query" value="宿舍是几人间，能确定吗？" aria-label="向新生入学助手提问"><button id="go">发送</button></div></div>
+
+  <button class="chat-launcher" id="chatLauncher" data-open-chat aria-label="打开新生助手"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/></svg>有问题？先问问我</button>
+  <div class="chat-backdrop" id="chatBackdrop"></div>
+  <aside class="chat-panel" id="chatPanel" role="dialog" aria-modal="true" aria-labelledby="chatHeading" aria-hidden="true">
+    <div class="drag-handle"></div>
+    <div class="chat-head"><div class="bot-avatar">AI</div><div class="chat-title"><strong id="chatHeading">新生 Copilot</strong><div class="chat-status"><span class="status-dot"></span><span id="chatStatus">连接知识库中…</span></div></div><button class="icon-btn" id="resetChat" aria-label="开始新对话" title="新对话"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg></button><button class="icon-btn" id="closeChat" aria-label="关闭助手"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
+    <div class="chat-messages" id="chatMessages" aria-live="polite"></div>
+    <div class="chat-compose"><div class="compose-box"><textarea id="chatInput" rows="1" maxlength="500" placeholder="问问报到、宿舍、选课、保研…" aria-label="向新生助手提问"></textarea><button class="send" id="sendChat" aria-label="发送问题"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg></button></div><div class="privacy">回答仅供参考；重要政策与个人事项请向老师或对应部门确认</div></div>
+  </aside>
+
   <script>
+    const $=s=>document.querySelector(s);
     const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-    const statusName={experience_only:'来自往届学生经验',supported:'有学校材料支持',supported_with_context:'学校材料与学生经验互相补充',supported_freshness_unverified:'有学校材料支持 · 请留意时效',supported_with_unresolved_wording:'已确认颁发证书 · 字样仍需核实',supported_with_unresolved_exclusivity:'已确认专业存在 · 开设范围仍需核实',mixed_sources_review_required:'多来源参考 · 请留意差异',web_supported:'已查询学校官网',public_web_supported:'已查询公开网络',web_supported_mixed:'学校官网与公开资料互相补充',insufficient_contextual_evidence:'暂时没有匹配这次追问的资料',insufficient_relevance:'知识库没有相关答案',insufficient:'暂时没有足够资料',insufficient_official_evidence:'还需要查询学校最新发布',unverified:'来源还需核实',error:'请求失败'};
-    const composerName={extractive_fallback:'本地可审计回答',openai_compatible:'大模型生成',none:'未生成'};
+    const safeUrl=u=>/^https?:\/\//i.test(u)||u.startsWith('/files/')?u:'#';
+    const fmtSize=n=>n>=1024?`${(n/1024).toFixed(n>=10240?0:1)} MB`:`${Math.round(n)} KB`;
+    const iconLabel={pdf:'PDF',word:'DOC',excel:'XLS',image:'IMG',link:'↗'};
     const authorityName={official_policy:'学校正式政策',official_guidance:'学校办事材料',official_web:'学校官网',public_web:'公开网络',peer_experience:'往届学生经验',unverified:'待核实资料'};
-    let sessionId=null;let first=true;
-    async function health(){const [h,s]=await Promise.all([fetch('/api/health').then(r=>r.json()),fetch('/api/corpus/stats').then(r=>r.json())]);const mode=h.composer?.mode==='model'?`模型 ${h.composer.model}`:'本地可审计降级回答';const webMode=h.composer?.web_retrieval?.mode;const web=webMode==='registry_plus_discovery'?'自主网页搜索已开启':webMode==='registry_only'?'仅使用已登记网页':'网页检索未开启';document.querySelector('#meta').innerHTML=`<span class="pill">${s.documents} documents</span><span class="pill">${s.chunks} chunks</span><span class="pill">${esc(mode)}</span><span class="pill">${esc(web)}</span><span class="pill">会话记忆：最近 4 轮</span>`}
-    function addUser(q){if(first){document.querySelector('#messages').innerHTML='';first=false}document.querySelector('#messages').insertAdjacentHTML('beforeend',`<article class="message user"><div class="label">你</div>${esc(q)}</article>`)}
-    function sourceCard(x){const origin=x.retrieval_origin;const authority=origin==='autonomous_search'?`${authorityName[x.authority_tier]||x.authority_tier} · 自主搜索`:origin==='verified_web_snapshot'?`${authorityName[x.authority_tier]||x.authority_tier} · 已核验快照`:origin==='live_web'?`${authorityName[x.authority_tier]||x.authority_tier} · 实时读取`:(authorityName[x.authority_tier]||x.authority_tier);const time=origin==='autonomous_search'?'<span>本轮自主搜索</span>':origin==='verified_web_snapshot'?'<span>已核验网页快照</span>':x.fetched_at?'<span>本轮实时读取</span>':x.published_at?`<span>发布 ${esc(x.published_at)}</span>`:x.effective_from?`<span>生效 ${esc(x.effective_from)}</span>`:'<span>时间信息待核实</span>';return `<details class="source"><summary><strong>${esc(x.title)}</strong></summary><div class="row"><span class="${esc(x.authority_tier)}">${esc(authority)}</span>${x.page_number?`<span>第 ${x.page_number} 页</span>`:''}${time}</div><p>${esc(x.text)}</p><a href="${esc(x.source_url)}" target="_blank" rel="noreferrer">查看原始来源</a></details>`}
-    function addAssistant(d){const provenance=d.provenance?.notice?`<div class="provenance"><strong>信息来源</strong><br>${esc(d.provenance.notice)}</div>`:'';const unresolved=d.unresolved?.length?`<div class="unresolved"><strong>需要留意</strong><br>${d.unresolved.map(esc).join('<br>')}</div>`:'';const handoff=d.human_handoff?`<div class="handoff"><strong>进一步确认</strong><br>${esc(d.human_handoff)}</div>`:'';const cited=d.sources||[];const sources=cited.length?`<div class="evidence"><details><summary>参考来源（${cited.length}）</summary>${cited.map(sourceCard).join('')}</details></div>`:'';const warning=d.composer_warning?`<span class="warning"> · 已自动切换安全回答</span>`:'';const discovery=d.provenance?.autonomous_search_executed?' · 已执行自主搜索':'';document.querySelector('#messages').insertAdjacentHTML('beforeend',`<article class="message assistant"><div class="label">学生大使 · ${esc(statusName[d.answerability]||d.answerability)}${discovery}</div><div class="answer">${esc(d.display_answer||d.answer)}</div>${provenance}${unresolved}${handoff}${sources}<div class="composer">第 ${d.conversation_turns} 轮${warning}</div></article>`);window.scrollTo({top:document.body.scrollHeight,behavior:'smooth'})}
-    async function ask(){const input=document.querySelector('#query');const q=input.value.trim();if(!q)return;addUser(q);input.value='';document.querySelector('#go').disabled=true;try{const r=await fetch('/api/chat',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({query:q,session_id:sessionId,profile:{cohort:'2026',student_level:'undergraduate'}})});const d=await r.json();if(!r.ok)throw new Error(d.error||'request_failed');sessionId=d.session_id;addAssistant(d)}catch(e){addAssistant({answer:'请求失败，请稍后重试。',answerability:'error',composer:'none',evidence:[],unresolved:[]})}finally{document.querySelector('#go').disabled=false;input.focus()}}
-    async function reset(){if(sessionId)await fetch('/api/session/reset',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({session_id:sessionId})});sessionId=null;first=true;document.querySelector('#messages').innerHTML='<div class="empty">新对话已开始。历史对话不会继续参与追问理解。</div>';}
-    document.querySelector('#go').addEventListener('click',ask);document.querySelector('#query').addEventListener('keydown',e=>{if(e.key==='Enter')ask()});document.querySelector('#reset').addEventListener('click',reset);health();
+    let library={files:[],links:[],questions:[],tags:[],counts:{}};let activeTab='resources';let activeTag='';let sessionId=null;let busy=false;
+
+    function boldText(text){return esc(text).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')}
+    async function loadLibrary(){
+      try{const r=await fetch('/api/library');if(!r.ok)throw new Error('library_failed');library=await r.json();$('#disclaimer').textContent=library.disclaimer;$('#stats').innerHTML=`<span class="stat"><strong>${library.counts.files}</strong> 份资料</span><span class="stat"><strong>${library.counts.links}</strong> 个常用入口</span><span class="stat"><strong>${library.counts.questions}</strong> 条学生问答</span>`;renderTags();renderLibrary()}
+      catch(e){$('#libraryContent').innerHTML='<div class="empty"><strong>资料库暂时没有加载出来</strong>可以先问问右下角的 Copilot，或稍后刷新页面。</div>'}
+    }
+    function renderTags(){const shown=library.tags.slice(0,18);$('#tags').innerHTML=`<button class="tag active" data-tag="">全部</button>`+shown.map(t=>`<button class="tag" data-tag="${esc(t.name)}">${esc(t.name)} · ${t.count}</button>`).join('');$('#tags').querySelectorAll('.tag').forEach(b=>b.onclick=()=>{activeTag=b.dataset.tag;renderTags();renderLibrary()})}
+    function resourceCard(item,isLink=false){const title=isLink?item.title:item.name;const description=item.description||'';const meta=isLink?'常用网站':`${fmtSize(item.size_kb)}${item.uploaded_at?` · ${esc(item.uploaded_at)}`:''}`;const type=isLink?'link':item.type;return `<a class="resource ${item.pinned?'pinned':''}" href="${esc(safeUrl(item.url))}" target="_blank" rel="noreferrer"><div class="file-icon ${esc(type)}">${iconLabel[type]||'FILE'}</div><div class="resource-info"><div class="resource-title">${esc(title)}${item.pinned?'<span class="pin">置顶</span>':''}</div><div class="resource-desc">${esc(description)}</div><div class="resource-meta"><span>${meta}</span>${(item.tags||[]).slice(0,3).map(t=>`<span class="mini-tag">${esc(t)}</span>`).join('')}</div></div><div class="open-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17 17 7M7 7h10v10"/></svg></div></a>`}
+    function normalizedQuery(){return $('#librarySearch').value.trim().toLowerCase()}
+    function includesItem(item,q){const blob=[item.name,item.title,item.description,...(item.tags||[])].filter(Boolean).join(' ').toLowerCase();return (!q||blob.includes(q))&&(!activeTag||(item.tags||[]).includes(activeTag))}
+    function renderResources(q){const files=library.files.filter(x=>includesItem(x,q));const links=library.links.filter(x=>includesItem(x,q));const items=[...files.map(x=>resourceCard(x)),...links.map(x=>resourceCard(x,true))];$('#resultCount').textContent=`${items.length} 项`;$('#libraryContent').className='resource-grid';$('#libraryContent').innerHTML=items.length?items.join(''):'<div class="empty"><strong>没有找到这份资料</strong>换个关键词，或者直接问问 Copilot。</div>'}
+    function renderQuestions(q){const filtered=library.questions.filter(x=>(!activeTag||x.category.includes(activeTag))&&(!q||(x.question+' '+x.answer+' '+x.category).toLowerCase().includes(q)));const groups={};filtered.forEach(x=>(groups[x.category]??=[]).push(x));let html='';for(const [category,items] of Object.entries(groups)){html+=`<div class="qa-group-title">${esc(category)}</div>`+items.map(x=>`<details class="qa-item"><summary>${esc(x.question)}</summary><div class="qa-answer">${boldText(x.answer)}</div></details>`).join('')}$('#resultCount').textContent=`${filtered.length} 个问题`;$('#libraryContent').className='qa-list';$('#libraryContent').innerHTML=html||'<div class="empty"><strong>没有找到对应问答</strong>这不代表没有答案，可以让 Copilot 帮你继续查。</div>'}
+    function renderLibrary(){const q=normalizedQuery();$('#clearSearch').style.display=q?'block':'none';$('#sectionTitle').textContent=activeTab==='resources'?'资料与常用入口':'新生百问百答';activeTab==='resources'?renderResources(q):renderQuestions(q)}
+    function setTab(tab){activeTab=tab;$('#resourcesTab').classList.toggle('active',tab==='resources');$('#questionsTab').classList.toggle('active',tab==='questions');$('#resourcesTab').setAttribute('aria-selected',tab==='resources');$('#questionsTab').setAttribute('aria-selected',tab==='questions');renderLibrary()}
+
+    function welcome(){return `<div class="chat-message assistant"><div class="message-label">新生 Copilot</div><div class="assistant-answer">有什么问题先问问我吧。\n\n我会先查这份资料库；如果资料库没找到、需要参考网页，或仍然不能确定，我会直接说明，再告诉你适合找谁确认。</div><div class="suggestions"><button class="suggestion">开学报到要带什么？</button><button class="suggestion">宿舍是几人间？</button><button class="suggestion">有保研机会吗？</button></div></div>`}
+    function bindSuggestions(){document.querySelectorAll('.suggestion').forEach(b=>b.onclick=()=>{$('#chatInput').value=b.textContent;ask()})}
+    function openChat(){$('#chatPanel').classList.add('open');$('#chatPanel').setAttribute('aria-hidden','false');$('#chatBackdrop').classList.add('show');$('#chatLauncher').classList.add('hidden');if(innerWidth<720)document.body.style.overflow='hidden';setTimeout(()=>$('#chatInput').focus(),260)}
+    function closeChat(){ $('#chatPanel').classList.remove('open');$('#chatPanel').setAttribute('aria-hidden','true');$('#chatBackdrop').classList.remove('show');$('#chatLauncher').classList.remove('hidden');document.body.style.overflow=''}
+    async function health(){try{const d=await fetch('/api/health').then(r=>r.json());const model=d.composer?.mode==='model'?'大模型已连接':'安全回答模式';const web=d.composer?.web_retrieval?.mode==='registry_plus_discovery'?' · 网页搜索已启用':'';$('#chatStatus').textContent=`${model}${web}`;}catch(e){$('#chatStatus').textContent='知识库连接待恢复'}}
+    function addUser(q){$('#chatMessages').insertAdjacentHTML('beforeend',`<div class="chat-message user"><div class="message-label">你</div>${esc(q)}</div>`);scrollChat()}
+    function typing(show){$('#typing')?.remove();if(show){$('#chatMessages').insertAdjacentHTML('beforeend','<div class="chat-message assistant" id="typing"><span class="typing"><i></i><i></i><i></i></span></div>');scrollChat()}}
+    function sourceCard(x){const origin=x.retrieval_origin==='autonomous_search'?' · 本轮网页搜索':x.retrieval_origin==='verified_web_snapshot'?' · 已核验网页快照':x.retrieval_origin==='live_web'?' · 本轮读取':'';return `<div class="source"><div class="source-title">${esc(x.title)}</div><div class="source-meta">${esc(authorityName[x.authority_tier]||x.authority_tier||'参考资料')}${origin}${x.page_number?` · 第 ${x.page_number} 页`:''}</div><a href="${esc(safeUrl(x.source_url||'#'))}" target="_blank" rel="noreferrer">查看原始来源 ↗</a></div>`}
+    function addAssistant(d){typing(false);const provenance=d.provenance?.notice?`<div class="answer-note"><strong>这段回答从哪里来</strong><br>${esc(d.provenance.notice)}</div>`:'';const unresolved=d.unresolved?.length?`<div class="answer-note warn"><strong>还不能完全确定</strong><br>${d.unresolved.map(esc).join('<br>')}</div>`:'';const handoff=d.human_handoff?`<div class="answer-note handoff"><strong>建议再确认一下</strong><br>${esc(d.human_handoff)}</div>`:'';const sources=d.sources||d.evidence||[];const evidence=sources.length?`<details class="sources"><summary>参考来源（${sources.length}）</summary>${sources.map(sourceCard).join('')}</details>`:'';$('#chatMessages').insertAdjacentHTML('beforeend',`<div class="chat-message assistant"><div class="message-label">新生 Copilot</div><div class="assistant-answer">${esc(d.display_answer||d.answer||'这次没有生成有效回答。')}</div>${provenance}${unresolved}${handoff}${evidence}</div>`);scrollChat()}
+    function scrollChat(){const box=$('#chatMessages');requestAnimationFrame(()=>box.scrollTo({top:box.scrollHeight,behavior:'smooth'}))}
+    async function ask(){const input=$('#chatInput');const q=input.value.trim();if(!q||busy)return;busy=true;input.value='';input.style.height='auto';$('#sendChat').disabled=true;addUser(q);typing(true);try{const r=await fetch('/api/chat',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({query:q,session_id:sessionId,profile:{cohort:'2026',student_level:'undergraduate'}})});const d=await r.json();if(!r.ok)throw new Error(d.error||'request_failed');sessionId=d.session_id;addAssistant(d)}catch(e){addAssistant({answer:'刚刚没有连上回答服务。你可以稍后再试，重要问题也可以先问师哥师姐或老师。',provenance:{notice:'本次请求失败，没有使用资料库或网页内容。'}})}finally{busy=false;$('#sendChat').disabled=false;input.focus()}}
+    async function resetChat(){if(sessionId)await fetch('/api/session/reset',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({session_id:sessionId})}).catch(()=>{});sessionId=null;$('#chatMessages').innerHTML=welcome();bindSuggestions();$('#chatInput').focus()}
+
+    $('#resourcesTab').onclick=()=>setTab('resources');$('#questionsTab').onclick=()=>setTab('questions');$('#librarySearch').oninput=renderLibrary;$('#clearSearch').onclick=()=>{$('#librarySearch').value='';renderLibrary();$('#librarySearch').focus()};document.querySelectorAll('[data-open-chat]').forEach(b=>b.onclick=openChat);$('#closeChat').onclick=closeChat;$('#chatBackdrop').onclick=closeChat;$('#resetChat').onclick=resetChat;$('#sendChat').onclick=ask;$('#chatInput').oninput=e=>{e.target.style.height='auto';e.target.style.height=Math.min(e.target.scrollHeight,110)+'px'};$('#chatInput').onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();ask()}};document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('#chatPanel').classList.contains('open'))closeChat()});
+    $('#chatMessages').innerHTML=welcome();bindSuggestions();loadLibrary();health();setTimeout(openChat,700);
   </script>
 </body>
 </html>
