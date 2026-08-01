@@ -51,6 +51,10 @@ class FrontendContractTest(unittest.TestCase):
         self.assertIn('class="sources"', self.html)
         self.assertIn("参考来源（", self.html)
 
+    def test_direct_file_open_redirects_to_the_loopback_service(self):
+        self.assertIn("location.protocol==='file:'", self.html)
+        self.assertIn("location.replace('http://127.0.0.1:8767/')", self.html)
+
 
 if __name__ == "__main__":
     unittest.main()
