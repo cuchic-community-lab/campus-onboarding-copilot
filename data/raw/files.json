@@ -1,0 +1,449 @@
+{
+    "tagColors": {
+        "推免": "red",
+        "保研": "red",
+        "官方文件": "red",
+        "必修": "red",
+        "入学": "red",
+        "选课": "blue",
+        "成绩": "blue",
+        "GPA": "blue",
+        "折算": "blue",
+        "体育": "blue",
+        "游泳": "blue",
+        "考试标准": "blue",
+        "素质拓展": "blue",
+        "A3": "blue",
+        "评分标准": "blue",
+        "劳育": "blue",
+        "劳动积分": "blue",
+        "志愿时长": "blue",
+        "文化活动": "blue",
+        "综合赋能": "blue",
+        "集体活动": "blue",
+        "加分": "blue",
+        "管理制度": "blue",
+        "海南学院": "blue",
+        "校级": "blue",
+        "指南": "blue",
+        "服务手册": "blue",
+        "2026": "blue",
+        "2023级": "blue",
+        "申请表": "blue",
+        "文档模板": "blue",
+        "新生": "blue",
+        "交通": "blue",
+        "摆渡车": "blue",
+        "试验区": "blue",
+        "线路图": "blue",
+        "生活": "blue",
+        "舍友": "blue",
+        "工具": "blue",
+        "娱乐": "blue",
+        "剧本杀": "blue",
+        "门户": "blue",
+        "校历": "blue",
+        "军训": "blue",
+        "请假": "blue",
+        "服装": "blue",
+        "家具": "blue",
+        "尺寸": "blue",
+        "信息采集": "blue",
+        "生活服务": "blue",
+        "年度": "blue",
+        "PDF": "blue",
+        "社团": "blue",
+        "T": "blue",
+        "图片": "blue",
+        "智慧树": "blue",
+        "知到": "blue",
+        "app": "blue",
+        "教程": "blue",
+        "平台": "blue",
+        "网课": "blue",
+        "学生手册": "blue",
+        "校规": "blue"
+    },
+    "files": [
+        {
+            "name": "入学指南.pdf",
+            "path": "files\/入学指南.pdf",
+            "type": "pdf",
+            "sizeKB": 11904.9,
+            "tags": [
+                "入学",
+                "指南",
+                "新生"
+            ],
+            "desc": "新生入学综合指南，必读",
+            "visible": true,
+            "pinned": true,
+            "priority": 10,
+            "uploadTime": "2026-07-16"
+        },
+        {
+            "name": "中传教字〔2026〕122号 关于印发《中国传媒大学推荐优秀应届本科毕业生免试攻读硕士学位研究生工作实施办法（试行）》的通知.pdf",
+            "path": "files\/中传教字〔2026〕122号 关于印发《中国传媒大学推荐优秀应届本科毕业生免试攻读硕士学位研究生工作实施办法（试行）》的通知.pdf",
+            "type": "pdf",
+            "sizeKB": 330.4,
+            "tags": [
+                "推免",
+                "保研",
+                "官方文件",
+                "校级"
+            ],
+            "desc": "中传推免工作实施办法校级正式通知",
+            "visible": true,
+            "pinned": false,
+            "priority": 9,
+            "uploadTime": "2026-05-20"
+        },
+        {
+            "name": "中国传媒大学海南国际学院2026年推荐优秀应届本科毕业生免试攻读研究生工作实施细则.pdf",
+            "path": "files\/中国传媒大学海南国际学院2026年推荐优秀应届本科毕业生免试攻读研究生工作实施细则.pdf",
+            "type": "pdf",
+            "sizeKB": 203.5,
+            "tags": [
+                "推免",
+                "保研",
+                "海南学院",
+                "2026"
+            ],
+            "desc": "海南国际学院推免实施细则（2026届）",
+            "visible": true,
+            "pinned": false,
+            "priority": 8,
+            "uploadTime": "2026-06-15"
+        },
+        {
+            "name": "中国传媒大学2026年推荐优秀应届本科毕业生免试攻读硕士学位研究生申请表（一般类别项目）.docx",
+            "path": "files\/中国传媒大学2026年推荐优秀应届本科毕业生免试攻读硕士学位研究生申请表（一般类别项目）.docx",
+            "type": "word",
+            "sizeKB": 14.6,
+            "tags": [
+                "推免",
+                "申请表",
+                "2026",
+                "文档模板"
+            ],
+            "desc": "推免申请表模板（一般类别项目），需自行填写提交",
+            "visible": true,
+            "pinned": false,
+            "priority": 7,
+            "uploadTime": "2026-06-15"
+        },
+        {
+            "name": "中国传媒大学海南国际学院选课服务手册.pdf",
+            "path": "files\/中国传媒大学海南国际学院选课服务手册.pdf",
+            "type": "pdf",
+            "sizeKB": 2005.1,
+            "tags": [
+                "选课",
+                "海南学院",
+                "服务手册"
+            ],
+            "desc": "海南国际学院选课操作指南",
+            "visible": true,
+            "pinned": true,
+            "priority": 8,
+            "uploadTime": "2026-07-16"
+        },
+        {
+            "name": "本科生院〔2025〕65号 关于印发《中国传媒大学本科生选课管理办法》的通知.pdf",
+            "path": "files\/本科生院〔2025〕65号 关于印发《中国传媒大学本科生选课管理办法》的通知.pdf",
+            "type": "pdf",
+            "sizeKB": 300.8,
+            "tags": [
+                "选课",
+                "管理制度",
+                "校级",
+                "官方文件"
+            ],
+            "desc": "本科生选课管理办法官方文件",
+            "visible": true,
+            "pinned": false,
+            "priority": 6,
+            "uploadTime": "2025-12-20"
+        },
+        {
+            "name": "游泳必修考试标准.pdf",
+            "path": "files\/游泳必修考试标准.pdf",
+            "type": "pdf",
+            "sizeKB": 51.9,
+            "tags": [
+                "体育",
+                "游泳",
+                "考试标准",
+                "必修"
+            ],
+            "desc": "游泳必修课考试评分标准",
+            "visible": true,
+            "pinned": false,
+            "priority": 5,
+            "uploadTime": "2026-07-16"
+        },
+        {
+            "name": "海南国际学院A3素质拓展评分标准.pdf",
+            "path": "files\/海南国际学院A3素质拓展评分标准.pdf",
+            "type": "pdf",
+            "sizeKB": 79.4,
+            "tags": [
+                "素质拓展",
+                "A3",
+                "评分标准",
+                "海南学院"
+            ],
+            "desc": "A3素质拓展评分标准细则",
+            "visible": true,
+            "pinned": false,
+            "priority": 5,
+            "uploadTime": "2026-07-16"
+        },
+        {
+            "name": "GPA折算表.jpg",
+            "path": "files\/GPA折算表.jpg",
+            "type": "image",
+            "sizeKB": 132.4,
+            "tags": [
+                "成绩",
+                "GPA",
+                "折算"
+            ],
+            "desc": "GPA成绩折算对照表",
+            "visible": true,
+            "pinned": false,
+            "priority": 4,
+            "uploadTime": "2026-07-16"
+        },
+        {
+            "name": "试验区摆渡车线路图-2026年3月版.png",
+            "path": "files\/试验区摆渡车线路图-2026年3月版.png",
+            "type": "image",
+            "sizeKB": 328.8,
+            "tags": [
+                "交通",
+                "摆渡车",
+                "试验区",
+                "线路图"
+            ],
+            "desc": "试验区摆渡车线路及班次（2026年3月版）",
+            "visible": true,
+            "pinned": false,
+            "priority": 4,
+            "uploadTime": "2026-07-16"
+        },
+        {
+            "name": "请假审批表.docx",
+            "path": "files\/请假审批表.docx",
+            "type": "word",
+            "sizeKB": 13.8,
+            "tags": [
+                "请假",
+                "文档模板"
+            ],
+            "desc": "请假审批通用模板",
+            "visible": true,
+            "pinned": false,
+            "priority": 3,
+            "uploadTime": "2026-07-16"
+        },
+        {
+            "name": "军训缓、免训审批表.docx",
+            "path": "files\/军训缓、免训审批表.docx",
+            "type": "word",
+            "sizeKB": 12.9,
+            "tags": [
+                "军训",
+                "文档模板"
+            ],
+            "desc": "军训缓训、免训申请审批表",
+            "visible": true,
+            "pinned": false,
+            "priority": 3,
+            "uploadTime": "2026-07-16"
+        },
+        {
+            "name": "新生各服装尺码参考.pdf",
+            "path": "files\/新生各服装尺码参考.pdf",
+            "type": "pdf",
+            "sizeKB": 628.6,
+            "tags": [
+                "新生",
+                "服装",
+                "尺寸"
+            ],
+            "desc": "新生各类服装尺码对照参考",
+            "visible": true,
+            "pinned": false,
+            "priority": 4,
+            "uploadTime": "2026-07-16"
+        },
+        {
+            "name": "信息采集服务手册.pdf",
+            "path": "files\/信息采集服务手册.pdf",
+            "type": "pdf",
+            "sizeKB": 2816.9,
+            "tags": [
+                "指南",
+                "新生",
+                "服务手册",
+                "信息采集"
+            ],
+            "desc": "新生信息采集操作指南",
+            "visible": true,
+            "pinned": false,
+            "priority": 5,
+            "uploadTime": "2026-07-16"
+        },
+        {
+            "name": "生活一、二区家具尺寸统计表.xlsx",
+            "path": "files\/生活一、二区家具尺寸统计表.xlsx",
+            "type": "excel",
+            "sizeKB": 722.4,
+            "tags": [
+                "生活",
+                "家具",
+                "尺寸"
+            ],
+            "desc": "生活区宿舍家具尺寸详细统计",
+            "visible": true,
+            "pinned": false,
+            "priority": 4,
+            "uploadTime": "2026-07-16"
+        },
+        {
+            "name": "2026-2027学年秋季学期社团资助金额.pdf",
+            "path": "files\/2026-2027学年秋季学期社团资助金额.pdf",
+            "type": "pdf",
+            "sizeKB": 110,
+            "tags": [
+                "PDF",
+                "社团"
+            ],
+            "desc": "社团名单参考",
+            "visible": true,
+            "pinned": false,
+            "priority": 5,
+            "uploadTime": "2026-07-20"
+        },
+        {
+            "name": "地图.pdf",
+            "path": "files\/地图.pdf",
+            "type": "pdf",
+            "sizeKB": 2451.3,
+            "tags": [
+                "PDF"
+            ],
+            "desc": "园区地图pdf（2025年9月版）",
+            "visible": true,
+            "pinned": false,
+            "priority": 2,
+            "uploadTime": "2026-07-21"
+        },
+        {
+            "name": "中国传媒大学2026-2027学年校历.png",
+            "path": "files\/中国传媒大学2026-2027学年校历.png",
+            "type": "image",
+            "sizeKB": 1125.5,
+            "tags": [
+                "校历",
+                "图片"
+            ],
+            "desc": "2026-2027学年校历",
+            "visible": true,
+            "pinned": true,
+            "priority": 1,
+            "uploadTime": "2026-07-23"
+        },
+        {
+            "name": "智慧树平台共享课导学（学生端讲解）.pdf",
+            "path": "files\/智慧树平台共享课导学（学生端讲解）.pdf",
+            "type": "pdf",
+            "sizeKB": 3350.4,
+            "tags": [
+                "PDF",
+                "智慧树",
+                "知到",
+                "app",
+                "教程",
+                "平台",
+                "网课"
+            ],
+            "desc": "智慧树平台共享课使用教程",
+            "visible": true,
+            "pinned": false,
+            "priority": 2,
+            "uploadTime": "2026-07-23"
+        },
+        {
+            "name": "中国传媒大学学生手册.pdf",
+            "path": "files\/中国传媒大学学生手册.pdf",
+            "type": "pdf",
+            "sizeKB": 2203.5,
+            "tags": [
+                "入学",
+                "PDF",
+                "学生手册",
+                "校规"
+            ],
+            "desc": "官方管理规定大全",
+            "visible": true,
+            "pinned": false,
+            "priority": 2,
+            "uploadTime": "2026-07-23"
+        }
+    ],
+    "links": [
+        {
+            "title": "剧本杀玩家匹配系统",
+            "url": "http:\/\/47.119.113.126",
+            "desc": "By 25智科dhy",
+            "tags": [
+                "娱乐",
+                "剧本杀",
+                "工具"
+            ],
+            "visible": true,
+            "pinned": false,
+            "priority": 4
+        },
+        {
+            "title": "中传融合门户",
+            "url": "https:\/\/i.cuc.edu.cn\/index.html",
+            "desc": "中国传媒大学新生融合门户",
+            "tags": [
+                "官方",
+                "门户",
+                "新生"
+            ],
+            "visible": true,
+            "pinned": true,
+            "priority": 7
+        },
+        {
+            "title": "中国传媒大学学生选课系统",
+            "url": "http:\/\/xsxk.cuc.edu.cn\/",
+            "desc": "仅在选课期间开放",
+            "tags": [
+                "选课",
+                "网站"
+            ],
+            "visible": true,
+            "pinned": true,
+            "priority": 5
+        },
+        {
+            "title": "畅课",
+            "url": "http:\/\/courses.cuc.edu.cn\/user\/index",
+            "desc": "中传官方线上课堂系统，马院课常用",
+            "tags": [
+                "课件",
+                "网站",
+                "讲义"
+            ],
+            "visible": true,
+            "pinned": false,
+            "priority": 5
+        }
+    ]
+}

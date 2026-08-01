@@ -8,10 +8,15 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PROHIBITED = (
     ".env.local",
-    "data/raw/",
     "data/processed/",
     "data/index/",
+    "data/official_sites/",
 )
+SENSITIVE_LIBRARY_FILES = {
+    "data/raw/files/劳育-公共劳动积分-《2023-2024学年海南国际学院团学劳动积分（2023级）》.xlsx",
+    "data/raw/files/劳育劳动文化活动-《相关志愿时长记录》.xlsx",
+    "data/raw/files/综合赋能-《集体活动参与加分》（2023级）.xlsx",
+}
 SECRET_PATTERNS = (
     re.compile(r"sk-[A-Za-z0-9_-]{20,}"),
     re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
@@ -30,6 +35,9 @@ def tracked_files() -> list[str]:
 def main() -> None:
     failures: list[str] = []
     for relative in tracked_files():
+        if relative in SENSITIVE_LIBRARY_FILES:
+            failures.append(f"sensitive student record must remain untracked: {relative}")
+            continue
         if relative == ".env.local" or relative.startswith(PROHIBITED[1:]):
             failures.append(f"prohibited tracked path: {relative}")
             continue
