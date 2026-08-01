@@ -4,9 +4,14 @@
 __pycache__/
 *.py[cod]
 .pytest_cache/
-data/raw/
+# The reviewed public library is versioned so CI, deployment, and collaborators
+# receive the same corpus. Student-level record sheets remain local-only.
+data/raw/files/劳育-公共劳动积分-《2023-2024学年海南国际学院团学劳动积分（2023级）》.xlsx
+data/raw/files/劳育劳动文化活动-《相关志愿时长记录》.xlsx
+data/raw/files/综合赋能-《集体活动参与加分》（2023级）.xlsx
 data/processed/
 data/index/
+data/official_sites/
 data/sync-report.json
 data/audit-report.json
 *.log

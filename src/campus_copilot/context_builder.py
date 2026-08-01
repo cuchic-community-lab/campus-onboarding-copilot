@@ -1,5 +1,7 @@
 from typing import Dict, List, Optional
 
+from .answer_planning import build_answer_plan
+
 
 SYSTEM_RULES = [
     "Only use supplied evidence; do not rely on model memory.",
@@ -8,6 +10,8 @@ SYSTEM_RULES = [
     "Preserve uncertainty words such as likely, inferred, expected, and unknown.",
     "If official evidence is required but missing, say what must be confirmed and abstain.",
     "Respect cohort, major, campus, and effective-date applicability.",
+    "Official web evidence may support school facts. Public web evidence must be labeled as a public reference and cannot be upgraded into an official school claim.",
+    "Never present a historical arrival notice or a public-web recommendation as the current official requirement.",
 ]
 
 GENERATABLE_MODES = {
@@ -16,6 +20,11 @@ GENERATABLE_MODES = {
     "supported_freshness_unverified",
     "mixed_sources_review_required",
     "experience_only",
+    "web_supported",
+    "public_web_supported",
+    "web_supported_mixed",
+    "supported_with_unresolved_wording",
+    "supported_with_unresolved_exclusivity",
 }
 
 
@@ -42,7 +51,22 @@ def build_context_packet(
             "student_level": result["student_level"],
             "uncertainty": result["uncertainty"],
             "text": result["text"],
+            "retrieval_origin": result.get("retrieval_origin", "local_knowledge"),
+            "web_source_kind": result.get("web_source_kind"),
+            "fetched_at": result.get("fetched_at"),
+            "evidence_coverage": result.get("evidence_coverage"),
         })
+    answer_plan = build_answer_plan(str(retrieval.get("query", "")), status)
+    web_search = retrieval.get("web_search") or {}
+    answer_plan.update({
+        "web_search_executed": bool(web_search.get("executed")),
+        "web_search_provider": web_search.get("provider"),
+        "web_search_status": web_search.get("status"),
+        "web_search_routes": web_search.get("routes", []),
+        "web_discovery_executed": bool((web_search.get("discovery") or {}).get("executed")),
+        "web_discovery_provider": (web_search.get("discovery") or {}).get("provider"),
+        "web_discovery_status": (web_search.get("discovery") or {}).get("status"),
+    })
     return {
         "query": retrieval.get("query"),
         "conversation_history": (conversation_history or [])[-8:],
@@ -50,6 +74,7 @@ def build_context_packet(
         "response_mode": status,
         "insufficient_reason": retrieval.get("insufficient_reason"),
         "system_rules": SYSTEM_RULES,
+        "answer_plan": answer_plan,
         "evidence": evidence,
-        "model_contract_version": "campus-grounding-v2",
+        "model_contract_version": "campus-grounding-v4-governed-web",
     }

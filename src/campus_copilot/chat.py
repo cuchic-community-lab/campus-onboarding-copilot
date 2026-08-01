@@ -4,8 +4,17 @@ import uuid
 from collections import OrderedDict
 from typing import Dict, List, Optional, Tuple
 
-from .composition import AnswerComposer, ExtractiveComposer, configured_composer, validate_composition
+from .composition import (
+    AnswerComposer,
+    ExtractiveComposer,
+    configured_composer,
+    display_answer,
+    validate_composition,
+)
 from .context_builder import build_context_packet
+from .answer_planning import build_answer_plan
+from .evidence_coverage import rank_and_filter_evidence
+from .web_retrieval import NullWebRetriever, WebRetriever
 
 
 FOLLOW_UP_MARKERS = ("那", "这个", "它", "还有", "上面", "刚才", "呢", "具体", "怎么办", "为什么")
@@ -66,6 +75,7 @@ class GroundedChatService:
         composer: Optional[AnswerComposer] = None,
         sessions: Optional[SessionStore] = None,
         provider_status: Optional[Dict[str, object]] = None,
+        web_retriever: Optional[WebRetriever] = None,
     ):
         if composer is None:
             composer, detected_status = configured_composer()
@@ -75,6 +85,83 @@ class GroundedChatService:
         self.sessions = sessions or SessionStore()
         self.provider_status = provider_status or {"mode": "custom", "adapter": composer.name}
         self.fallback = ExtractiveComposer()
+        self.web_retriever = web_retriever or NullWebRetriever()
+
+    @staticmethod
+    def _web_routes(fallback_route: str) -> List[str]:
+        if fallback_route == "official_and_public_web_discovery":
+            return ["official", "public"]
+        if fallback_route == "official_web_discovery":
+            return ["official"]
+        if fallback_route == "public_web_discovery":
+            return ["public"]
+        return []
+
+    @staticmethod
+    def _human_handoff(question_type: str) -> str:
+        if question_type in {"current_official", "credential_wording", "program_offering", "institution_structure"}:
+            return "这类学校政策、专业或证书问题如果仍有疑问，建议向学院教务老师或招生办公室确认。"
+        if question_type == "campus_experience":
+            return "这类校园生活安排可能会变化，建议再问问本届师哥师姐确认实际情况。"
+        if question_type == "general_guidance":
+            return "这类发展方向没有唯一答案，也可以结合师哥师姐的去向，或咨询专业老师和就业指导老师。"
+        return "如果这个问题会影响你的实际安排，建议再向师哥师姐或负责老师确认。"
+
+    def _enrich_with_web(self, query: str, retrieval: Dict[str, object], top_k: int) -> Dict[str, object]:
+        plan = build_answer_plan(query, str(retrieval.get("answerability", "insufficient")))
+        routes = self._web_routes(str(plan["fallback_route"]))
+        if not routes:
+            return retrieval
+        web_search = self.web_retriever.search(query, routes, min(4, top_k))
+        enriched = dict(retrieval)
+        enriched["local_answerability_before_web"] = str(retrieval.get("answerability", "insufficient"))
+        enriched["local_results_before_web"] = len(retrieval.get("results", []))
+        enriched["web_search"] = {key: value for key, value in web_search.items() if key != "results"}
+        web_results = list(web_search.get("results", []))
+        question_type = str(plan["question_type"])
+        if not web_results and question_type not in {"credential_wording", "program_offering"}:
+            return enriched
+
+        if question_type in {"arrival_preparation", "institution_structure", "general_guidance"}:
+            # These are explicitly web-governed intents. Weak local passages
+            # must not become evidence merely because they share campus words.
+            merged_results = web_results
+        else:
+            merged_results = rank_and_filter_evidence(
+                query,
+                question_type,
+                web_results + list(retrieval.get("results", [])),
+            )
+        enriched["results"] = merged_results[:top_k]
+        has_official = any(
+            item.get("authority_tier") in {"official_web", "official_policy", "official_guidance"}
+            for item in merged_results
+        )
+        has_public = any(item.get("authority_tier") == "public_web" for item in merged_results)
+        has_direct_answer = any(
+            bool(item.get("evidence_coverage", {}).get("direct_answer"))
+            for item in merged_results
+        )
+        if question_type in {"credential_wording", "program_offering"} and not merged_results:
+            enriched["answerability"] = "insufficient_question_coverage"
+            enriched["insufficient_reason"] = "evidence_does_not_cover_question_object"
+        elif question_type == "program_offering" and not has_direct_answer:
+            enriched["answerability"] = "supported_with_unresolved_exclusivity"
+            enriched["insufficient_reason"] = "no_scoped_official_source_proves_program_exclusivity"
+        elif question_type == "credential_wording" and not has_direct_answer:
+            enriched["answerability"] = "supported_with_unresolved_wording"
+            enriched["insufficient_reason"] = "no_source_directly_confirms_certificate_wording"
+        elif has_official and has_public:
+            enriched["answerability"] = "web_supported_mixed"
+        elif has_official:
+            enriched["answerability"] = "web_supported"
+        elif has_public:
+            enriched["answerability"] = "public_web_supported"
+        else:
+            enriched["answerability"] = str(retrieval.get("answerability", "insufficient"))
+        enriched["retrieval_mode"] = str(retrieval.get("retrieval_mode", "local")) + "+curated_live_web"
+        enriched["requires_uncertainty_label"] = any(item.get("uncertainty") for item in web_results)
+        return enriched
 
     def ask(
         self,
@@ -98,30 +185,72 @@ class GroundedChatService:
             if coverage is not None and float(coverage) < 0.6:
                 retrieval["answerability"] = "insufficient_contextual_evidence"
                 retrieval["insufficient_reason"] = "top_evidence_does_not_cover_enough_of_the_prior_topic"
+        retrieval = self._enrich_with_web(retrieval_query, retrieval, top_k)
         retrieval["query"] = query
         context = build_context_packet(retrieval, history)
 
         warning: Optional[str] = None
         composer_used = self.composer.name
-        try:
-            composition = self.composer.generate(context)
-            valid, errors = validate_composition(composition, context)
-            if not valid:
-                warning = "model_output_failed_grounding_validation:" + ",".join(errors)
-                composition = self.fallback.generate(context)
-                composer_used = self.fallback.name
-        except Exception:
-            warning = "model_provider_unavailable_fallback_used"
+        if not context.get("can_generate"):
             composition = self.fallback.generate(context)
             composer_used = self.fallback.name
+        else:
+            try:
+                composition = self.composer.generate(context)
+                valid, errors = validate_composition(composition, context)
+                if not valid:
+                    warning = "model_output_failed_grounding_validation:" + ",".join(errors)
+                    composition = self.fallback.generate(context)
+                    composer_used = self.fallback.name
+            except Exception:
+                warning = "model_provider_unavailable_fallback_used"
+                composition = self.fallback.generate(context)
+                composer_used = self.fallback.name
 
         citations = [str(item) for item in composition.get("citations", [])]
         self.sessions.append(session_id, query, str(composition["answer"]), citations)
+        cited = set(citations)
+        sources = [
+            item for item in context["evidence"]
+            if str(item.get("evidence_id")) in cited
+        ]
+        answer_plan = context["answer_plan"]
+        source_origins = {str(item.get("retrieval_origin", "local_knowledge")) for item in sources}
+        autonomous_used = "autonomous_search" in source_origins
+        registered_web_used = bool(source_origins.intersection({"live_web", "verified_web_snapshot"}))
+        local_status = str(retrieval.get("local_answerability_before_web", retrieval.get("answerability", "")))
+        local_source_used = "local_knowledge" in source_origins
+        local_insufficient = (
+            local_status.startswith("insufficient")
+            or local_status == "unverified"
+            or ((autonomous_used or registered_web_used) and not local_source_used)
+        )
+        discovery_executed = bool(answer_plan.get("web_discovery_executed"))
+        if autonomous_used:
+            provenance_notice = "我在知识库里没有找到足以回答这个问题的内容，下面的回答来自本轮联网搜索。"
+            provenance_mode = "autonomous_web_fallback"
+        elif registered_web_used and local_insufficient:
+            provenance_notice = "我在知识库里没有找到足够材料，下面参考的是已登记并核验过的网页来源，不是本轮自主搜索。"
+            provenance_mode = "registered_web_fallback"
+        elif discovery_executed and not autonomous_used:
+            provenance_notice = "我在知识库和本轮联网搜索中都没有找到足够可靠的内容，因此没有根据相似材料下结论。"
+            provenance_mode = "web_search_insufficient"
+        elif local_insufficient:
+            provenance_notice = "我在知识库里没有找到足够材料，而且当前自主网页搜索尚未启用。"
+            provenance_mode = "search_unavailable"
+        else:
+            provenance_notice = "这次回答主要依据当前知识库中的材料。"
+            provenance_mode = "local_knowledge"
+        needs_handoff = provenance_mode in {
+            "web_search_insufficient", "search_unavailable", "registered_web_fallback",
+        } or bool(composition.get("unresolved"))
+        human_handoff = self._human_handoff(str(answer_plan.get("question_type", "campus_fact"))) if needs_handoff else ""
         return {
             "session_id": session_id,
             "query": query,
             "retrieval_query": retrieval_query,
             "answer": composition["answer"],
+            "display_answer": display_answer(str(composition["answer"])),
             "citations": citations,
             "claims": composition.get("claims", []),
             "unresolved": composition.get("unresolved", []),
@@ -129,6 +258,16 @@ class GroundedChatService:
             "composer": composer_used,
             "composer_warning": warning,
             "evidence": context["evidence"],
+            "sources": sources,
+            "answer_plan": answer_plan,
+            "provenance": {
+                "mode": provenance_mode,
+                "notice": provenance_notice,
+                "knowledge_base_sufficient": not local_insufficient,
+                "autonomous_search_executed": discovery_executed,
+                "autonomous_search_used": autonomous_used,
+            },
+            "human_handoff": human_handoff,
             "conversation_turns": len(history) // 2 + 1,
         }
 
@@ -136,4 +275,6 @@ class GroundedChatService:
         self.sessions.reset(session_id)
 
     def status(self) -> Dict[str, object]:
-        return dict(self.provider_status)
+        status = dict(self.provider_status)
+        status["web_retrieval"] = self.web_retriever.status()
+        return status

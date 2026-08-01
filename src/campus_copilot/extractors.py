@@ -224,4 +224,6 @@ def load_documents() -> Tuple[List[DocumentRecord], List[Dict[str, str]]]:
         content=markdown,
         checksum=hashlib.sha256(markdown.encode("utf-8")).hexdigest(),
     ))
+    from .official_sync import load_approved_official_documents
+    documents.extend(load_approved_official_documents())
     return documents, faq_units

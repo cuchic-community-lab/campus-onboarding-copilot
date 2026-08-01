@@ -10,9 +10,14 @@ from typing import Dict, Iterable, List, Optional, Tuple
 
 from .db import chinese_search_terms, connect
 from .source_policy import AUTHORITY_CONFIDENCE
+from .answer_planning import classify_question
 
 
 SYNONYMS = {
+    "视传": ["视觉传达", "视觉传达设计"],
+    "视觉传达": ["视觉传达设计", "视传"],
+    "中外合办": ["中外合作办学"],
+    "中外合作办学": ["中外合办"],
     "宿舍": ["寝室", "生活区", "床位"],
     "寝室": ["宿舍", "生活区", "床位"],
     "选课": ["课程", "选修课", "选课系统"],
@@ -30,6 +35,7 @@ SYNONYMS = {
 
 DOMAIN_ENTITY_GROUPS = {
     "recommendation_admission": ("保研", "推免", "推荐免试", "免试攻读"),
+    "visual_communication": ("视传", "视觉传达", "视觉传达设计"),
 }
 
 POLICY_TERMS = ("必须", "规定", "办法", "申请", "截止", "毕业", "选课", "成绩", "请假", "军训", "办理")
@@ -42,6 +48,7 @@ CONCEPT_TERMS = (
     "军训", "请假", "校历", "摆渡车", "交通", "绩点", "gpa", "社团", "四级",
     "床垫", "床铺", "尺寸", "规格", "多大", "长", "宽", "床",
     "推荐免试", "免试攻读", "推免", "保研", "保留学籍",
+    "视觉传达设计", "视觉传达", "视传", "中外合作办学", "中外合办",
 )
 
 DIMENSION_QUERY_TERMS = ("多大", "尺寸", "规格", "长宽", "多长", "多宽", "厘米", "cm")
@@ -191,6 +198,9 @@ class HybridRetriever:
         query_concepts = _query_concepts(query)
         requested_entities = _requested_domain_entities(query)
         availability_query = any(term in query for term in ("有吗", "有没有", "机会", "是否"))
+        historical_outcome_query = any(
+            term in query for term in ("多少人", "多少名", "百分之", "比例", "排到多少", "大概")
+        )
         procedure_query = any(term in query for term in ("怎么", "如何", "操作", "步骤"))
         rule_query = any(term in query for term in ("规定", "最低", "必须", "退课", "学分"))
         dimension_query = any(term in query.lower() for term in DIMENSION_QUERY_TERMS)
@@ -281,6 +291,16 @@ class HybridRetriever:
                 # Availability questions benefit from a direct observed outcome
                 # alongside policy documents that only establish a mechanism.
                 task_multiplier *= 1.45
+            if (
+                historical_outcome_query
+                and domain_entity_match
+                and row["chunk_type"] == "faq"
+                and re.search(r"(?:\d+\s*人|\d+(?:\.\d+)?%|比例)", row["text"] or "")
+            ):
+                # A question about observed cohort outcomes should prefer an
+                # observed cohort answer over a policy document containing
+                # unrelated scoring formulas.
+                task_multiplier *= 1.7
             applicability = 1.0
             if profile.get("cohort") and row["cohort"] and profile["cohort"] != row["cohort"]:
                 applicability *= 0.75
@@ -349,7 +369,34 @@ class HybridRetriever:
             for item in results[:3]
         )
         uncertain = any(item["uncertainty"] for item in results[:3])
-        if not results:
+        question_type = classify_question(query)
+        general_guidance_supported = any(
+            any(term in " ".join([
+                str(item.get("title", "")),
+                str(item.get("heading_path", "")),
+                str(item.get("text", "")),
+            ]) for term in ("就业方向", "职业方向", "就业领域", "就业岗位", "从事", "毕业去向"))
+            for item in results[:3]
+        )
+        top_coverage = float(
+            (results[0].get("score_explanation") or {}).get("concept_coverage", 0.0)
+        ) if results else 0.0
+        top_anchor_coverage = float(
+            (results[0].get("score_explanation") or {}).get("anchor_coverage", 0.0)
+        ) if results else 0.0
+        top_entity_match = float(
+            (results[0].get("score_explanation") or {}).get("domain_entity_match", 0.0)
+        ) if results else 0.0
+        weak_local_match = (
+            bool(results)
+            and max(top_coverage, top_anchor_coverage) < 0.35
+            and top_entity_match < 1.0
+        )
+        if question_type == "general_guidance" and not general_guidance_supported:
+            status = "insufficient"
+        elif weak_local_match:
+            status = "insufficient_relevance"
+        elif not results:
             status = "insufficient"
         elif intent == "policy_or_procedure" and not has_official:
             status = "insufficient_official_evidence"
@@ -367,5 +414,6 @@ class HybridRetriever:
             "retrieval_mode": "fts5_plus_local_subword_rrf",
             "answerability": status,
             "requires_uncertainty_label": uncertain,
+            "local_match_quality": "weak" if weak_local_match else ("usable" if results else "none"),
             "results": results,
         }

@@ -31,6 +31,18 @@ Source site
 retrieval unit; it never loses its parent source, page, authority, or
 applicability.
 
+Reviewed live sources are a separate, ephemeral evidence layer. Their registry
+stores URL, authority, topic hints, and applicability, while each answer records
+the actual retrieval time and extracted passage. A fetched webpage does not
+silently become a durable knowledge-base document; promotion into the indexed
+corpus requires the normal ingestion and review process.
+
+The governed official-site synchronizer is that promotion path. It maintains
+immutable content-addressed page versions outside Git, while a small state file
+tracks the current checksum and `pending`, `approved`, or `rejected` status.
+New or changed content is never indexed before explicit review. During a build,
+only the latest approved version becomes an `official_web` document.
+
 ## Chunking policy
 
 | Source | Unit | Why |
@@ -60,6 +72,20 @@ FAQ answers depend on their questions; procedure steps depend on their order.
    coverage, source-type fit, and applicability. Authority is only a near-tie
    signal; it does not multiplicatively demote student experience.
 6. Produce an answerability state before calling a model.
+7. When the answer plan routes to the web, fetch only registered HTTPS hosts,
+   then recompute answerability using the retrieved `official_web` and/or
+   `public_web` evidence.
+8. Before adopting a passage, compare it with the question's required aspects.
+   A lexical match on a background attribute does not satisfy a missing answer
+   object. Rank direct coverage before authority, then use authority and
+   freshness to qualify the supported claim.
+9. When a search provider is configured, execute discovery for planned web
+   routes, deduplicate discovered URLs with registry results, and apply the same
+   evidence contract. Missing credentials produce registry-only behavior rather
+   than a false claim that open-web search ran.
+10. Run official-site synchronization independently of user questions. Promote
+    only reviewed snapshots, and reset approval whenever the page checksum
+    changes.
 
 Retrieval relevance and answer trust are separate concerns. Student-authored
 guides and measurements may rank first when they directly answer a lifestyle
@@ -82,6 +108,13 @@ and dates are often stronger than semantic similarity.
 - `mixed_sources_review_required`: official and peer evidence coexist and a
   top passage contains uncertainty.
 - `experience_only`: only student experience supports the response.
+- `web_supported`: a retrieved official webpage supports the answer.
+- `public_web_supported`: a retrieved public source supports general context,
+  not school policy.
+- `web_supported_mixed`: official and public live evidence jointly support
+  clearly separated claims.
+- `supported_with_unresolved_wording`: a source confirms which credential is
+  awarded, but no source directly confirms its wording or appearance.
 - `insufficient_official_evidence`: the question asks for a rule or procedure
   but no official evidence is available.
 - `unverified` / `insufficient`: the system must not generate a factual answer.
