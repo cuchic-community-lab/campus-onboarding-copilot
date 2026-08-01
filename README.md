@@ -100,13 +100,16 @@ cookie, same-origin POST checks, per-client login/chat rate limits, no-store
 caching, and browser security headers:
 
 ```bash
-CAMPUS_PREVIEW_ACCESS_CODE='at-least-16-random-characters' make serve
+CAMPUS_PREVIEW_ACCESS_CODE='at-least-16-random-characters' \
+CAMPUS_PREVIEW_ALLOWED_ORIGINS='https://exact-preview-host.example' make serve
 ```
 
 Expose that protected local process only through a temporary HTTPS tunnel and
 stop both processes after testing. Quick tunnels are a development convenience,
 not a production deployment or an authorization service. Never commit the
 access code or enter sensitive personal information in a preview environment.
+When a reverse proxy changes the origin-facing `Host`, configure only its exact
+HTTPS public origin. Wildcard tunnel origins are intentionally unsupported.
 
 DOCX and XLSX body extraction, plus the development toolchain, are enabled
 when optional packages are installed:

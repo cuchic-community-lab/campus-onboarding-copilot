@@ -40,6 +40,21 @@ class PreviewSecurityTest(unittest.TestCase):
         self.assertTrue(self.guard.same_origin({"Host": "preview.example"}))
         self.assertFalse(self.guard.same_origin({"Host": "preview.example", "Origin": "https://evil.example"}))
 
+    def test_exact_configured_tunnel_origin_is_allowed_without_wildcard(self):
+        guard = PreviewGuard(
+            "correct-horse-battery-staple",
+            session_secret=b"s" * 32,
+            allowed_origins="https://one-random.trycloudflare.com",
+        )
+        self.assertTrue(guard.same_origin({
+            "Host": "127.0.0.1:8767",
+            "Origin": "https://one-random.trycloudflare.com",
+        }))
+        self.assertFalse(guard.same_origin({
+            "Host": "127.0.0.1:8767",
+            "Origin": "https://other-random.trycloudflare.com",
+        }))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -39,12 +39,17 @@ class SlidingWindowLimiter:
 
 
 class PreviewGuard:
-    def __init__(self, access_code: str = None, session_secret: bytes = None) -> None:
+    def __init__(self, access_code: str = None, session_secret: bytes = None, allowed_origins: str = None) -> None:
         self.access_code = access_code if access_code is not None else os.environ.get("CAMPUS_PREVIEW_ACCESS_CODE", "")
         if self.access_code and len(self.access_code) < 16:
             raise ValueError("CAMPUS_PREVIEW_ACCESS_CODE must contain at least 16 characters")
         self.enabled = bool(self.access_code)
         self._secret = session_secret or secrets.token_bytes(32)
+        configured_origins = allowed_origins if allowed_origins is not None else os.environ.get("CAMPUS_PREVIEW_ALLOWED_ORIGINS", "")
+        self.allowed_origins = {
+            origin.strip().rstrip("/") for origin in configured_origins.split(",")
+            if origin.strip().startswith("https://")
+        }
         self.limiter = SlidingWindowLimiter()
 
     def _session_value(self) -> str:
@@ -84,13 +89,12 @@ class PreviewGuard:
         forwarded = headers.get("X-Forwarded-For", "").split(",", 1)[0].strip()
         return (forwarded or fallback)[:64]
 
-    @staticmethod
-    def same_origin(headers: Mapping[str, str]) -> bool:
-        origin = headers.get("Origin", "").strip()
+    def same_origin(self, headers: Mapping[str, str]) -> bool:
+        origin = headers.get("Origin", "").strip().rstrip("/")
         host = headers.get("Host", "").strip()
         if not origin:
             return True
-        return origin in {f"https://{host}", f"http://{host}"}
+        return origin in {f"https://{host}", f"http://{host}"} or origin in self.allowed_origins
 
     def allow_login(self, client_ip: str) -> bool:
         return self.limiter.allow("login:" + client_ip, limit=8, window_seconds=600)
