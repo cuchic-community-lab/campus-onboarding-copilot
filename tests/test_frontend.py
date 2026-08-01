@@ -43,6 +43,14 @@ class FrontendContractTest(unittest.TestCase):
         ):
             self.assertIn(preference, self.html)
 
+    def test_chat_progress_is_human_readable_and_sources_remain_available(self):
+        self.assertIn("正在翻阅往届师兄师姐留下来的材料…", self.html)
+        self.assertIn("正在整理回答中…", self.html)
+        self.assertIn('class="assistant-progress"', self.html)
+        self.assertNotIn('class="answer-note', self.html)
+        self.assertIn('class="sources"', self.html)
+        self.assertIn("参考来源（", self.html)
+
 
 if __name__ == "__main__":
     unittest.main()
