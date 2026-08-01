@@ -94,6 +94,20 @@ make demo       # run an uncertainty-sensitive example query
 make serve      # open http://127.0.0.1:8000
 ```
 
+For a short-lived remote preview, set a strong one-time access code before
+starting the server. This enables a login gate, signed four-hour HttpOnly
+cookie, same-origin POST checks, per-client login/chat rate limits, no-store
+caching, and browser security headers:
+
+```bash
+CAMPUS_PREVIEW_ACCESS_CODE='at-least-16-random-characters' make serve
+```
+
+Expose that protected local process only through a temporary HTTPS tunnel and
+stop both processes after testing. Quick tunnels are a development convenience,
+not a production deployment or an authorization service. Never commit the
+access code or enter sensitive personal information in a preview environment.
+
 DOCX and XLSX body extraction, plus the development toolchain, are enabled
 when optional packages are installed:
 

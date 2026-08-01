@@ -1,8 +1,6 @@
 import json
 import mimetypes
-from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
 from typing import Dict
 from urllib.parse import quote, urlparse
 
@@ -13,6 +11,7 @@ from .retrieval import HybridRetriever
 from .service import corpus_stats
 from .web_retrieval import configured_web_retriever
 from .library import library_payload, resolve_library_file
+from .preview_security import PreviewGuard, login_page, parse_login_body, preview_status
 
 
 WEB_ROOT = PROJECT_ROOT / "web"
@@ -21,6 +20,42 @@ WEB_ROOT = PROJECT_ROOT / "web"
 class AppHandler(BaseHTTPRequestHandler):
     retriever = HybridRetriever(DB_PATH)
     chat = GroundedChatService(retriever, web_retriever=configured_web_retriever())
+    preview = PreviewGuard()
+
+    def end_headers(self) -> None:
+        if self.preview.enabled:
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; form-action 'self'; base-uri 'none'")
+            self.send_header("Cross-Origin-Opener-Policy", "same-origin")
+            self.send_header("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+            self.send_header("Referrer-Policy", "no-referrer")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("X-Frame-Options", "DENY")
+            if self.headers.get("X-Forwarded-Proto", "").lower() == "https":
+                self.send_header("Strict-Transport-Security", "max-age=86400")
+        super().end_headers()
+
+    def _client_ip(self) -> str:
+        return self.preview.client_ip(self.headers, self.client_address[0])
+
+    def _protected(self, path: str, is_chat: bool = False) -> bool:
+        if not self.preview.enabled:
+            return True
+        if not self.preview.authorized(self.headers):
+            if self.command == "GET" and path in {"/", "/index.html", "/preview/login"}:
+                body = login_page()
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            else:
+                self._json({"error": "preview_auth_required"}, 401)
+            return False
+        if not self.preview.allow_request(self._client_ip(), is_chat=is_chat):
+            self._json({"error": "rate_limited"}, 429)
+            return False
+        return True
 
     def _json(self, body: Dict[str, object], status: int = 200) -> None:
         payload = json.dumps(body, ensure_ascii=False, indent=2).encode("utf-8")
@@ -38,6 +73,12 @@ class AppHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:  # noqa: N802
         path = urlparse(self.path).path
+        if path == "/api/preview/status":
+            enabled, mode = preview_status(self.preview)
+            self._json({"enabled": enabled, "mode": mode})
+            return
+        if not self._protected(path):
+            return
         if path == "/api/health":
             self._json({
                 "status": "ok",
@@ -78,8 +119,36 @@ class AppHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         try:
-            payload = self._read_json()
             path = urlparse(self.path).path
+            if path == "/api/preview/login" and self.preview.enabled:
+                if not self.preview.same_origin(self.headers):
+                    self._json({"error": "origin_rejected"}, 403)
+                    return
+                if not self.preview.allow_login(self._client_ip()):
+                    self._json({"error": "rate_limited"}, 429)
+                    return
+                length = min(int(self.headers.get("Content-Length", "0")), 4097)
+                code = parse_login_body(self.rfile.read(length), self.headers.get("Content-Type", ""))
+                if not self.preview.valid_code(code):
+                    body = login_page("访问口令不正确，请检查后重试。")
+                    self.send_response(401)
+                    self.send_header("Content-Type", "text/html; charset=utf-8")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+                    return
+                self.send_response(303)
+                secure = self.headers.get("X-Forwarded-Proto", "").lower() == "https"
+                self.send_header("Location", "/")
+                self.send_header("Set-Cookie", self.preview.session_cookie(secure=secure))
+                self.end_headers()
+                return
+            if not self._protected(path, is_chat=path == "/api/chat"):
+                return
+            if self.preview.enabled and not self.preview.same_origin(self.headers):
+                self._json({"error": "origin_rejected"}, 403)
+                return
+            payload = self._read_json()
             if path == "/api/session/reset":
                 session_id = str(payload.get("session_id") or "")
                 if session_id:
