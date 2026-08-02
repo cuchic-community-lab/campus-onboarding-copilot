@@ -107,6 +107,14 @@ class AppHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
+        if path == "/assets/hic-copilot-text-logo.svg":
+            body = (WEB_ROOT / "assets" / "hic-copilot-text-logo.svg").read_bytes()
+            self.send_response(200)
+            self.send_header("Content-Type", "image/svg+xml; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
         if path in {"/", "/index.html"}:
             body = (WEB_ROOT / "index.html").read_bytes()
             self.send_response(200)

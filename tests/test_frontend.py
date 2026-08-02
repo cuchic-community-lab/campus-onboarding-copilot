@@ -3,7 +3,7 @@ from pathlib import Path
 
 
 WEB_INDEX = Path(__file__).resolve().parents[1] / "web" / "index.html"
-LOGO = Path(__file__).resolve().parents[1] / "web" / "assets" / "hic-copilot-logo.svg"
+LOGO = Path(__file__).resolve().parents[1] / "web" / "assets" / "hic-copilot-text-logo.svg"
 
 
 class FrontendContractTest(unittest.TestCase):
@@ -43,7 +43,7 @@ class FrontendContractTest(unittest.TestCase):
             'class="composer-wrap"',
             'id="openDrawer"',
             'id="collapseSidebar"',
-            "嗨，我是 HIC Copilot，想问点什么？",
+            "嗨，我是HIC Copilot",
         ):
             self.assertIn(contract, self.html)
         for retired_control in (
@@ -64,22 +64,27 @@ class FrontendContractTest(unittest.TestCase):
         self.assertIn("<svg", logo)
         self.assertIn("HIC Copilot", logo)
         for contract in (
-            'class="brand-logo" viewBox="0 0 128 128"',
-            '<strong>HIC Copilot</strong>',
+            'class="brand-logo" src="/assets/hic-copilot-text-logo.svg"',
+            'class="welcome-copy-line"',
             'function setDesktopSidebar',
             'function scheduleSidebarAutoExpand',
             "setTimeout(()=>{sidebarAutoTimer=null",
             "},5000)",
             "current.classList.add('copy-fade')",
+            "},800)},10000)",
+            "transition:opacity 800ms ease-in-out",
+            "grid-template-rows:minmax(0,1fr) auto",
+            "grid-template-rows:auto minmax(0,1fr) auto",
+            ".chat-messages:has(.welcome){display:grid;place-items:center}",
             "基于往届师哥师姐搜集的材料回复，请注意核实",
         ):
             self.assertIn(contract, self.html)
         for copy in (
-            "嗨，我是 HIC Copilot，想问点什么？",
-            "你好呀，欢迎加入中传海南！",
-            "关于学校的问题，尽管问！",
-            "准备好开始大学村生活了吗？",
-            "别紧张，就当在问师哥师姐。",
+            "['嗨，我是HIC Copilot']",
+            "['你好呀，欢迎加入','中传海南！']",
+            "['关于学校的问题，','尽管问！']",
+            "['准备好开始','大学村生活了吗？']",
+            "['别紧张，','就当在问师哥师姐。']",
         ):
             self.assertIn(copy, self.html)
 
