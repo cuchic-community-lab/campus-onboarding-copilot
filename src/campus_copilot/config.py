@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 
@@ -8,6 +9,8 @@ RAW_FILES_DIR = RAW_DIR / "files"
 PROCESSED_DIR = DATA_DIR / "processed"
 INDEX_DIR = DATA_DIR / "index"
 DB_PATH = INDEX_DIR / "knowledge.db"
+RUNTIME_DIR = DATA_DIR / "runtime"
+TRACE_DB_PATH = Path(os.getenv("CAMPUS_TRACE_DB_PATH", str(RUNTIME_DIR / "rag_traces.db")))
 
 SOURCE_BASE_URL = "https://hic.zihuanana.top/"
 FILES_MANIFEST_URL = SOURCE_BASE_URL + "files.json"

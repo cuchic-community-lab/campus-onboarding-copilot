@@ -1,8 +1,7 @@
 import argparse
 import json
-from pathlib import Path
 
-from .config import DB_PATH
+from .config import DB_PATH, TRACE_DB_PATH
 from .chat import GroundedChatService
 from .context_builder import build_context_packet
 from .evaluation import evaluate, evaluate_chat
@@ -12,6 +11,7 @@ from .service import audit_corpus, build_knowledge_base, corpus_stats
 from .sync import sync_corpus
 from .web_retrieval import configured_web_retriever
 from .official_sync import review_official_page, sync_official_sites
+from .tracing import SQLiteTraceStore
 
 
 def _print(value: object) -> None:
@@ -51,6 +51,12 @@ def main() -> None:
     review_group = official_review_parser.add_mutually_exclusive_group()
     review_group.add_argument("--approve")
     review_group.add_argument("--reject")
+    traces_parser = sub.add_parser("traces")
+    traces_sub = traces_parser.add_subparsers(dest="traces_command", required=True)
+    traces_list_parser = traces_sub.add_parser("list")
+    traces_list_parser.add_argument("--limit", type=int, default=20)
+    traces_show_parser = traces_sub.add_parser("show")
+    traces_show_parser.add_argument("trace_id")
     args = parser.parse_args()
 
     if args.command == "sync":
@@ -88,6 +94,15 @@ def main() -> None:
             _print(review_official_page(args.reject, "rejected"))
         else:
             _print(review_official_page())
+    elif args.command == "traces":
+        store = SQLiteTraceStore(TRACE_DB_PATH)
+        if args.traces_command == "list":
+            _print({"database": str(TRACE_DB_PATH), "traces": store.list_recent(args.limit)})
+        else:
+            trace = store.get(args.trace_id)
+            if trace is None:
+                parser.error(f"trace not found: {args.trace_id}")
+            _print(trace)
 
 
 if __name__ == "__main__":

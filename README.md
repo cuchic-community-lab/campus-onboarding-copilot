@@ -156,6 +156,38 @@ curl -s http://127.0.0.1:8000/api/search \
 uses prior user intent to resolve explicit follow-ups, retrieves fresh evidence
 for every turn, and returns both an audit answer and a citation-free
 `display_answer`, plus only the cited `sources` for student-facing rendering.
+It also returns a `trace_id` for correlating the answer with its local execution
+trace.
+
+## RAG execution traces
+
+The development runtime records a privacy-aware trace for each chat request in
+the ignored local database `data/runtime/rag_traces.db`. A trace shows the
+redacted query, contextualized retrieval query, local and web candidates,
+selected and rejected evidence, answerability decision, model/provider and
+fallback path, grounding validation, final response, citations, errors, and
+per-stage latency. It intentionally does not store hidden model reasoning,
+credentials, cookies, or authorization headers. Common email addresses, phone
+numbers, and long identifiers are redacted, and session IDs are one-way hashed.
+
+Inspect recent requests or one complete flow with:
+
+```bash
+campus-copilot traces list --limit 20
+campus-copilot traces show trace_<id>
+```
+
+Tracing is enabled by default for development and retained for 30 days. Change
+the local behavior without editing code:
+
+```dotenv
+CAMPUS_TRACE_ENABLED=0
+CAMPUS_TRACE_RETENTION_DAYS=30
+CAMPUS_TRACE_DB_PATH=/absolute/local/path/rag_traces.db
+```
+
+For a public deployment, keep this database outside the web root, restrict
+operator access, and set a retention period appropriate to the privacy policy.
 
 When local evidence is insufficient, the answer plan can execute governed live
 retrieval. `config/web_sources.json` registers reviewed school and public
