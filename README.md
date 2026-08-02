@@ -189,6 +189,24 @@ CAMPUS_TRACE_DB_PATH=/absolute/local/path/rag_traces.db
 For a public deployment, keep this database outside the web root, restrict
 operator access, and set a retention period appropriate to the privacy policy.
 
+When an answer has neither sufficient knowledge-base evidence nor a usable web
+fallback, the UI offers an explicit, optional human follow-up form. A submitted
+email is stored in a separate `human_handoffs` table together with the redacted
+query and its `trace_id`; it is not sent to the model and is not added to the
+knowledge base. Operators can review the private queue on the server:
+
+```bash
+PYTHONPATH=src .venv/bin/python -m campus_copilot.cli handoffs list --limit 20
+PYTHONPATH=src .venv/bin/python -m campus_copilot.cli handoffs show handoff_<id>
+```
+
+The endpoint requires same-origin browser submission, validates the email and
+trace, and limits each client to five submissions per hour. Human-follow-up
+records use the same retention period as traces. Because the address must remain
+usable for a reply, it is sensitive plaintext operational data: never place the
+runtime database under `web/`, commit it, or expose it through a public admin
+endpoint.
+
 When local evidence is insufficient, the answer plan can execute governed live
 retrieval. `config/web_sources.json` registers reviewed school and public
 sources together with query hints, authority, dates, and applicability. The

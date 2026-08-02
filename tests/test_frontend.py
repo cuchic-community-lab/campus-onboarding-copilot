@@ -165,12 +165,40 @@ class FrontendContractTest(unittest.TestCase):
             self.assertIn(preference, self.html)
 
     def test_chat_progress_is_human_readable_and_sources_remain_available(self):
-        self.assertIn("正在翻阅往届师兄师姐留下来的材料…", self.html)
-        self.assertIn("正在整理回答中…", self.html)
+        for copy in (
+            "正在查找往届师哥师姐的材料…",
+            "让我看看有没有一些官方材料…",
+            "稍等哈，看下热心师姐留下的经验…",
+            "好像有个师哥之前提到过，我找下…",
+            "找到啦！让我整理一下答案…",
+            "回答梳理中…",
+            "绝妙秘籍制作中…",
+            "找到有用的了，让我想想怎么跟你讲…",
+            "亲亲别急，马上就好…",
+            "还有一会儿就好，等我下…",
+            "在打最后几个字了，稍等～",
+        ):
+            self.assertIn(copy, self.html)
+        self.assertIn("await delay(4000)", self.html)
+        self.assertIn("setTimeout(reassure,8000)", self.html)
         self.assertIn('class="assistant-progress"', self.html)
         self.assertNotIn('class="answer-note', self.html)
         self.assertIn('class="sources"', self.html)
         self.assertIn("参考来源（", self.html)
+
+    def test_unanswered_question_has_responsive_opt_in_human_handoff(self):
+        for contract in (
+            "/api/handoff",
+            'class="handoff-card"',
+            'class="handoff-email"',
+            'type="email"',
+            'autocomplete="email"',
+            "仅用于回复本次问题，保留 30 天",
+            "不会发送给大模型或加入知识库",
+            "submitHandoff",
+            "trace_id:form.dataset.traceId",
+        ):
+            self.assertIn(contract, self.html)
 
     def test_direct_file_open_redirects_to_the_loopback_service(self):
         self.assertIn("location.protocol==='file:'", self.html)

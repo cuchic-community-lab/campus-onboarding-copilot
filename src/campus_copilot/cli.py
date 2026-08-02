@@ -12,6 +12,7 @@ from .sync import sync_corpus
 from .web_retrieval import configured_web_retriever
 from .official_sync import review_official_page, sync_official_sites
 from .tracing import SQLiteTraceStore
+from .handoffs import SQLiteHandoffStore
 
 
 def _print(value: object) -> None:
@@ -57,6 +58,12 @@ def main() -> None:
     traces_list_parser.add_argument("--limit", type=int, default=20)
     traces_show_parser = traces_sub.add_parser("show")
     traces_show_parser.add_argument("trace_id")
+    handoffs_parser = sub.add_parser("handoffs")
+    handoffs_sub = handoffs_parser.add_subparsers(dest="handoffs_command", required=True)
+    handoffs_list_parser = handoffs_sub.add_parser("list")
+    handoffs_list_parser.add_argument("--limit", type=int, default=20)
+    handoffs_show_parser = handoffs_sub.add_parser("show")
+    handoffs_show_parser.add_argument("handoff_id")
     args = parser.parse_args()
 
     if args.command == "sync":
@@ -103,6 +110,15 @@ def main() -> None:
             if trace is None:
                 parser.error(f"trace not found: {args.trace_id}")
             _print(trace)
+    elif args.command == "handoffs":
+        store = SQLiteHandoffStore(TRACE_DB_PATH)
+        if args.handoffs_command == "list":
+            _print({"database": str(TRACE_DB_PATH), "handoffs": store.list_recent(args.limit)})
+        else:
+            handoff = store.get(args.handoff_id)
+            if handoff is None:
+                parser.error(f"handoff not found: {args.handoff_id}")
+            _print(handoff)
 
 
 if __name__ == "__main__":

@@ -298,13 +298,23 @@ class GroundedChatService:
                 "web_search_insufficient", "search_unavailable", "registered_web_fallback",
             } or bool(composition.get("unresolved"))
             human_handoff = self._human_handoff(str(answer_plan.get("question_type", "campus_fact"))) if needs_handoff else ""
+            handoff_available = (
+                provenance_mode in {"web_search_insufficient", "search_unavailable"}
+                and self.trace_store.enabled
+            )
+            student_answer = display_answer(str(composition["answer"]))
+            if handoff_available:
+                student_answer = (
+                    "抱歉啊，我暂时回答不了。不过你可以留下邮箱，这个问题会由一位活的师哥或师姐回答；"
+                    "或者加一下我的制造者问问，顺便骂一下他做的什么狗屎 AI。他的微信是：RellFu。"
+                )
             response = {
                 "trace_id": trace_id,
                 "session_id": session_id,
                 "query": query,
                 "retrieval_query": retrieval_query,
                 "answer": composition["answer"],
-                "display_answer": display_answer(str(composition["answer"])),
+                "display_answer": student_answer,
                 "citations": citations,
                 "claims": composition.get("claims", []),
                 "unresolved": composition.get("unresolved", []),
@@ -322,6 +332,7 @@ class GroundedChatService:
                     "autonomous_search_used": autonomous_used,
                 },
                 "human_handoff": human_handoff,
+                "handoff_available": handoff_available,
                 "conversation_turns": len(history) // 2 + 1,
             }
             timings[stage] = round((time.perf_counter() - phase_started) * 1000)
@@ -398,6 +409,7 @@ class GroundedChatService:
                     "unresolved": response["unresolved"],
                     "provenance": response["provenance"],
                     "human_handoff": human_handoff,
+                    "handoff_available": handoff_available,
                 },
                 "timings_ms": timings,
                 "error": None,

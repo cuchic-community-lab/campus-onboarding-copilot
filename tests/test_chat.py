@@ -2,6 +2,7 @@ import unittest
 
 from campus_copilot.chat import GroundedChatService, SessionStore, contextualize_query
 from campus_copilot.composition import ExtractiveComposer
+from campus_copilot.tracing import NullTraceStore
 
 
 class FakeRetriever:
@@ -171,6 +172,9 @@ class ChatTest(unittest.TestCase):
         self.assertEqual(result["provenance"]["mode"], "search_unavailable")
         self.assertIn("自主网页搜索尚未启用", result["provenance"]["notice"])
         self.assertTrue(result["human_handoff"])
+        self.assertTrue(result["handoff_available"])
+        self.assertIn("留下邮箱", result["display_answer"])
+        self.assertIn("RellFu", result["display_answer"])
 
     def test_autonomous_web_fallback_is_explicitly_disclosed(self):
         retriever = FakeRetriever()
@@ -191,6 +195,24 @@ class ChatTest(unittest.TestCase):
         self.assertTrue(result["provenance"]["autonomous_search_used"])
         self.assertIn("知识库里没有找到", result["provenance"]["notice"])
         self.assertIn("本轮联网搜索", result["provenance"]["notice"])
+        self.assertFalse(result["handoff_available"])
+
+    def test_handoff_form_is_hidden_when_trace_storage_is_disabled(self):
+        retriever = FakeRetriever()
+
+        def insufficient_search(query, top_k, profile):
+            result = FakeRetriever().search(query, top_k, profile)
+            result["answerability"] = "insufficient"
+            return result
+
+        retriever.search = insufficient_search
+        result = GroundedChatService(
+            retriever,
+            composer=ExtractiveComposer(),
+            trace_store=NullTraceStore(),
+        ).ask("一个无法回答的新问题")
+        self.assertEqual(result["provenance"]["mode"], "search_unavailable")
+        self.assertFalse(result["handoff_available"])
 
     def test_registered_snapshot_is_not_presented_as_autonomous_search(self):
         result = GroundedChatService(
@@ -202,6 +224,7 @@ class ChatTest(unittest.TestCase):
         self.assertFalse(result["provenance"]["autonomous_search_executed"])
         self.assertIn("不是本轮自主搜索", result["provenance"]["notice"])
         self.assertIn("教务老师或招生办公室", result["human_handoff"])
+        self.assertFalse(result["handoff_available"])
 
     def test_follow_up_uses_prior_user_question_for_retrieval(self):
         retriever = FakeRetriever()
