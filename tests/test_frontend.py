@@ -3,6 +3,7 @@ from pathlib import Path
 
 
 WEB_INDEX = Path(__file__).resolve().parents[1] / "web" / "index.html"
+PROJECT_AGENTS = Path(__file__).resolve().parents[1] / "AGENTS.md"
 
 
 class FrontendContractTest(unittest.TestCase):
@@ -93,23 +94,49 @@ class FrontendContractTest(unittest.TestCase):
         ):
             self.assertNotIn(removed, self.html)
 
-    def test_welcome_suggestions_are_short_labels_backed_by_full_qa_questions(self):
+    def test_responsive_welcome_suggestion_groups_are_qa_backed(self):
         for contract in (
             "const suggestionSeeds=",
             "library.questions.find",
             "seed.terms.every",
             'data-question="${esc(item.question)}"',
             "b.dataset.question",
-            "renderWelcomeSuggestions()",
-            "overflow-x:auto",
-            "flex-wrap:nowrap",
-            "scroll-snap-type:x proximity",
+            "renderWelcomeSuggestions(true)",
+            "function suggestionGroupSize(){return mobileDrawer.matches?2:3}",
+            "Array.from({length:size}",
+            "suggestionGroupIndex+=1",
+            "},260)},5000)",
             "宿舍几人间？",
             "快递怎么填？",
             "大墩村有什么？",
         ):
             self.assertIn(contract, self.html)
         self.assertNotIn(".suggestions{display:none}", self.html)
+        self.assertNotIn("overflow-x:auto", self.html)
+
+    def test_desktop_and_mobile_composer_and_header_contracts(self):
+        for contract in (
+            ".compose-box:focus-within{border-color:rgba(60,60,67,.16);box-shadow:0 12px 36px rgba(0,0,0,.08)}",
+            "textarea::-webkit-scrollbar{display:none}",
+            "textarea:focus-visible{outline:0;box-shadow:none!important}",
+            ".top-title{display:none}",
+            ".compose-note{display:block",
+            "justify-content:space-between",
+        ):
+            self.assertIn(contract, self.html)
+        self.assertNotIn("box-shadow:var(--focus),0 12px 36px", self.html)
+
+    def test_mobile_and_desktop_quality_gate_is_durable(self):
+        rules = PROJECT_AGENTS.read_text(encoding="utf-8")
+        for contract in (
+            "Every user-interface change",
+            "both desktop and phone layouts",
+            "Mobile is a blocking product surface",
+            "390 by 844 CSS pixels",
+            "no horizontal page overflow",
+            "Do not report a UI change complete until both surfaces pass",
+        ):
+            self.assertIn(contract, rules)
 
     def test_accessibility_preferences_have_explicit_fallbacks(self):
         for preference in (
