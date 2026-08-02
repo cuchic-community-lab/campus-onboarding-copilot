@@ -1,3 +1,5 @@
+import base64
+import re
 import unittest
 from pathlib import Path
 
@@ -64,7 +66,7 @@ class FrontendContractTest(unittest.TestCase):
         self.assertIn("<svg", logo)
         self.assertIn("HIC Copilot", logo)
         for contract in (
-            'class="brand-logo" src="/assets/hic-copilot-text-logo.svg"',
+            'class="brand-logo" src="data:image/svg+xml;base64,',
             'class="welcome-copy-line"',
             'function setDesktopSidebar',
             'function scheduleSidebarAutoExpand',
@@ -87,6 +89,12 @@ class FrontendContractTest(unittest.TestCase):
             "['别紧张，','就当在问师哥师姐。']",
         ):
             self.assertIn(copy, self.html)
+        embedded = re.search(
+            r'class="brand-logo" src="data:image/svg\+xml;base64,([^"]+)"',
+            self.html,
+        )
+        self.assertIsNotNone(embedded)
+        self.assertEqual(base64.b64decode(embedded.group(1)), LOGO.read_bytes())
 
     def test_accessibility_preferences_have_explicit_fallbacks(self):
         for preference in (
