@@ -3,6 +3,7 @@ from pathlib import Path
 
 
 WEB_INDEX = Path(__file__).resolve().parents[1] / "web" / "index.html"
+LOGO = Path(__file__).resolve().parents[1] / "web" / "assets" / "hic-copilot-logo.svg"
 
 
 class FrontendContractTest(unittest.TestCase):
@@ -36,23 +37,51 @@ class FrontendContractTest(unittest.TestCase):
 
     def test_chat_first_shell_replaces_the_floating_panel_and_filter_toolbar(self):
         for contract in (
-            'class="app-shell"',
-            'class="sidebar"',
+            'class="app-shell sidebar-collapsed"',
+            'class="sidebar compact"',
             'class="workspace"',
             'class="composer-wrap"',
             'id="openDrawer"',
-            'id="newChat"',
-            "嗨，我们从哪开始？",
+            'id="collapseSidebar"',
+            "嗨，我是 HIC Copilot，想问点什么？",
         ):
             self.assertIn(contract, self.html)
         for retired_control in (
+            'id="newChat"',
             'id="chatLauncher"',
             'id="chatPanel"',
             'id="resourcesTab"',
             'id="questionsTab"',
             'id="tags"',
+            'class="welcome-mark"',
+            'class="sidebar-foot"',
         ):
             self.assertNotIn(retired_control, self.html)
+
+    def test_hic_identity_collapsible_sidebar_and_rotating_welcome_contract(self):
+        self.assertTrue(LOGO.exists())
+        logo = LOGO.read_text(encoding="utf-8")
+        self.assertIn("<svg", logo)
+        self.assertIn("HIC Copilot", logo)
+        for contract in (
+            'class="brand-logo" viewBox="0 0 128 128"',
+            '<strong>HIC Copilot</strong>',
+            'function setDesktopSidebar',
+            'function scheduleSidebarAutoExpand',
+            "setTimeout(()=>{sidebarAutoTimer=null",
+            "},5000)",
+            "current.classList.add('copy-fade')",
+            "基于往届师哥师姐搜集的材料回复，请注意核实",
+        ):
+            self.assertIn(contract, self.html)
+        for copy in (
+            "嗨，我是 HIC Copilot，想问点什么？",
+            "你好呀，欢迎加入中传海南！",
+            "关于学校的问题，尽管问！",
+            "准备好开始大学村生活了吗？",
+            "别紧张，就当在问师哥师姐。",
+        ):
+            self.assertIn(copy, self.html)
 
     def test_accessibility_preferences_have_explicit_fallbacks(self):
         for preference in (
@@ -83,7 +112,7 @@ class FrontendContractTest(unittest.TestCase):
         self.assertIn("const q=input.value.trim()||guidedQuestion()", self.html)
         self.assertIn("updateInputGuide(true)", self.html)
         self.assertIn("发送示例问题：", self.html)
-        self.assertIn("输入为空时可直接发送示例", self.html)
+        self.assertIn("基于往届师哥师姐搜集的材料回复，请注意核实", self.html)
 
     def test_library_search_includes_files_links_and_questions(self):
         self.assertIn("library.files.filter", self.html)

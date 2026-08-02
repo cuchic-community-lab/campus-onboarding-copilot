@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title description">
+  <title id="title">HIC Copilot</title>
+  <desc id="description">彩色圆角方形中的微笑小猴头像</desc>
+  <defs>
+    <linearGradient id="spectrum" x1="9" y1="8" x2="119" y2="121" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3ee7ff"/>
+      <stop offset=".28" stop-color="#4085ff"/>
+      <stop offset=".53" stop-color="#8767ff"/>
+      <stop offset=".76" stop-color="#ff5da8"/>
+      <stop offset="1" stop-color="#ffbd4a"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientTransform="translate(42 27) rotate(48) scale(104)">
+      <stop stop-color="#fff" stop-opacity=".7"/>
+      <stop offset=".45" stop-color="#fff" stop-opacity=".12"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="fur" x1="22" y1="20" x2="106" y2="111" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff" stop-opacity=".58"/>
+      <stop offset="1" stop-color="#dff7ff" stop-opacity=".28"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="5" stdDeviation="5" flood-color="#24308c" flood-opacity=".22"/>
+    </filter>
+  </defs>
+  <rect x="4" y="4" width="120" height="120" rx="31" fill="url(#spectrum)"/>
+  <rect x="5" y="5" width="118" height="118" rx="30" fill="url(#glow)" stroke="#fff" stroke-opacity=".44"/>
+  <g filter="url(#shadow)" stroke="#26359e" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M29 78c-9-2-14-9-13-18 1-9 8-15 17-14C39 28 51 19 65 19c14 0 27 9 32 27 9-1 16 5 17 14 1 9-5 17-14 18-3 19-16 31-35 31S33 97 29 78Z" fill="url(#fur)"/>
+    <circle cx="31" cy="62" r="10" fill="#fff" fill-opacity=".22"/>
+    <circle cx="99" cy="62" r="10" fill="#fff" fill-opacity=".22"/>
+    <path d="M65 42c7-12 26-9 31 6 6 18-2 43-31 45-29-2-37-27-31-45 5-15 24-18 31-6Z" fill="#fff" stroke-width="1.8"/>
+    <ellipse cx="51" cy="59" rx="6.5" ry="9" fill="#3541a8"/>
+    <ellipse cx="79" cy="59" rx="6.5" ry="9" fill="#3541a8"/>
+    <circle cx="53" cy="56" r="2.1" fill="#fff" stroke="none"/>
+    <circle cx="81" cy="56" r="2.1" fill="#fff" stroke="none"/>
+    <ellipse cx="65" cy="72" rx="5" ry="3.4" fill="#3541a8"/>
+    <path d="M50 81c4 8 26 8 30 0" fill="none" stroke-width="3"/>
+    <path d="M43 32c7-6 8-11 5-17 8 4 12 9 10 16 6-6 7-12 4-18 10 5 15 13 11 22" fill="none"/>
+  </g>
+  <ellipse cx="41" cy="73" rx="6" ry="3.5" fill="#ffb7b7" fill-opacity=".6"/>
+  <ellipse cx="89" cy="73" rx="6" ry="3.5" fill="#ffb7b7" fill-opacity=".6"/>
+</svg>
