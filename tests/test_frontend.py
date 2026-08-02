@@ -1,11 +1,8 @@
-import base64
-import re
 import unittest
 from pathlib import Path
 
 
 WEB_INDEX = Path(__file__).resolve().parents[1] / "web" / "index.html"
-LOGO = Path(__file__).resolve().parents[1] / "web" / "assets" / "hic-copilot-text-logo.svg"
 
 
 class FrontendContractTest(unittest.TestCase):
@@ -44,8 +41,9 @@ class FrontendContractTest(unittest.TestCase):
             'class="workspace"',
             'class="composer-wrap"',
             'id="openDrawer"',
+            'id="expandSidebar"',
             'id="collapseSidebar"',
-            "嗨，我是HIC Copilot",
+            '<div class="sidebar-title">资料库</div>',
         ):
             self.assertIn(contract, self.html)
         for retired_control in (
@@ -60,13 +58,10 @@ class FrontendContractTest(unittest.TestCase):
         ):
             self.assertNotIn(retired_control, self.html)
 
-    def test_hic_identity_collapsible_sidebar_and_rotating_welcome_contract(self):
-        self.assertTrue(LOGO.exists())
-        logo = LOGO.read_text(encoding="utf-8")
-        self.assertIn("<svg", logo)
-        self.assertIn("HIC Copilot", logo)
+    def test_logoless_collapsible_sidebar_and_rotating_welcome_contract(self):
         for contract in (
-            'class="brand-logo" src="data:image/svg+xml;base64,',
+            'class="icon-btn sidebar-expand"',
+            'aria-label="展开资料库"',
             'class="welcome-copy-line"',
             'function setDesktopSidebar',
             'function scheduleSidebarAutoExpand',
@@ -82,19 +77,39 @@ class FrontendContractTest(unittest.TestCase):
         ):
             self.assertIn(contract, self.html)
         for copy in (
-            "['嗨，我是HIC Copilot']",
-            "['你好呀，欢迎加入','中传海南！']",
+            "['嗨！我是','HIC Copilot。']",
+            "['欢迎加入','中传海南！']",
             "['关于学校的问题，','尽管问！']",
-            "['准备好开始','大学村生活了吗？']",
+            "['准备好开始','大敦村生活了吗？']",
             "['别紧张，','就当在问师哥师姐。']",
         ):
             self.assertIn(copy, self.html)
-        embedded = re.search(
-            r'class="brand-logo" src="data:image/svg\+xml;base64,([^"]+)"',
-            self.html,
-        )
-        self.assertIsNotNone(embedded)
-        self.assertEqual(base64.b64decode(embedded.group(1)), LOGO.read_bytes())
+        for removed in (
+            "brand-logo",
+            "brand-home",
+            "data:image/svg+xml",
+            "radial-gradient",
+            "可以直接问我，也可以从左侧资料库查文件",
+        ):
+            self.assertNotIn(removed, self.html)
+
+    def test_welcome_suggestions_are_short_labels_backed_by_full_qa_questions(self):
+        for contract in (
+            "const suggestionSeeds=",
+            "library.questions.find",
+            "seed.terms.every",
+            'data-question="${esc(item.question)}"',
+            "b.dataset.question",
+            "renderWelcomeSuggestions()",
+            "overflow-x:auto",
+            "flex-wrap:nowrap",
+            "scroll-snap-type:x proximity",
+            "宿舍几人间？",
+            "快递怎么填？",
+            "大墩村有什么？",
+        ):
+            self.assertIn(contract, self.html)
+        self.assertNotIn(".suggestions{display:none}", self.html)
 
     def test_accessibility_preferences_have_explicit_fallbacks(self):
         for preference in (
