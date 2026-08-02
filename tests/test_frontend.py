@@ -99,8 +99,8 @@ class FrontendContractTest(unittest.TestCase):
             "const suggestionSeeds=",
             "library.questions.find",
             "seed.terms.every",
-            'data-question="${esc(item.question)}"',
-            "b.dataset.question",
+            'data-question="${esc(item.label)}"',
+            "ask(b.dataset.question)",
             "renderWelcomeSuggestions(true)",
             "function suggestionGroupSize(){return mobileDrawer.matches?2:3}",
             "Array.from({length:size}",
@@ -113,6 +113,20 @@ class FrontendContractTest(unittest.TestCase):
             self.assertIn(contract, self.html)
         self.assertNotIn(".suggestions{display:none}", self.html)
         self.assertNotIn("overflow-x:auto", self.html)
+        self.assertNotIn("question:source.question", self.html)
+
+    def test_suggestion_click_sends_visible_copy_and_enters_conversation(self):
+        for contract in (
+            "async function ask(explicitQuestion='')",
+            "const q=explicitQuestion.trim()||input.value.trim()||guidedQuestion()",
+            "messages.classList.add('conversation-active')",
+            "messages.classList.remove('conversation-active')",
+            "$('#welcomeState')?.remove()",
+            ".chat-messages.conversation-active{padding-top:8px}",
+            ".suggestion{flex:0 1 auto;width:auto",
+            "overflow-wrap:anywhere",
+        ):
+            self.assertIn(contract, self.html)
 
     def test_desktop_and_mobile_composer_and_header_contracts(self):
         for contract in (
@@ -164,7 +178,7 @@ class FrontendContractTest(unittest.TestCase):
 
     def test_empty_composer_can_send_and_advance_a_guided_question(self):
         self.assertIn("const guidedQuestions=", self.html)
-        self.assertIn("const q=input.value.trim()||guidedQuestion()", self.html)
+        self.assertIn("explicitQuestion.trim()||input.value.trim()||guidedQuestion()", self.html)
         self.assertIn("updateInputGuide(true)", self.html)
         self.assertIn("发送示例问题：", self.html)
         self.assertIn("基于往届师哥师姐搜集的材料回复，请注意核实", self.html)
