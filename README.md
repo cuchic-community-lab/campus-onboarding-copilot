@@ -156,6 +156,71 @@ curl -s http://127.0.0.1:8000/api/search \
 uses prior user intent to resolve explicit follow-ups, retrieves fresh evidence
 for every turn, and returns both an audit answer and a citation-free
 `display_answer`, plus only the cited `sources` for student-facing rendering.
+It also returns a `trace_id` for correlating the answer with its local execution
+trace.
+
+## RAG execution traces
+
+The development runtime records a privacy-aware trace for each chat request in
+the ignored local database `data/runtime/rag_traces.db`. A trace shows the
+redacted query, contextualized retrieval query, local and web candidates,
+selected and rejected evidence, answerability decision, model/provider and
+fallback path, grounding validation, final response, citations, errors, and
+per-stage latency. It intentionally does not store hidden model reasoning,
+credentials, cookies, or authorization headers. Common email addresses, phone
+numbers, and long identifiers are redacted, and session IDs are one-way hashed.
+
+Inspect recent requests or one complete flow with:
+
+```bash
+campus-copilot traces list --limit 20
+campus-copilot traces show trace_<id>
+```
+
+Each new trace includes `environment` and `source`. Browser traffic is labeled
+`browser`, command-line chat is `cli`, and contract evaluation is `evaluation`.
+Filter the operator list when reviewing real traffic:
+
+```bash
+campus-copilot traces list --environment production --source browser --limit 50
+```
+
+Set `CAMPUS_ENVIRONMENT=production` in the deployed server environment. Local
+development defaults to `development`; rows created before this metadata was
+introduced are preserved and labeled `legacy`.
+
+Tracing is enabled by default for development and retained for 30 days. Change
+the local behavior without editing code:
+
+```dotenv
+CAMPUS_TRACE_ENABLED=0
+CAMPUS_TRACE_RETENTION_DAYS=30
+CAMPUS_TRACE_DB_PATH=/absolute/local/path/rag_traces.db
+CAMPUS_ENVIRONMENT=development
+```
+
+For a public deployment, keep this database outside the web root, restrict
+operator access, and set a retention period appropriate to the privacy policy.
+
+When the final answer cannot provide both cited evidence and a supported useful
+conclusion—including partial web results that do not resolve the core
+question—the UI uses the standard human-handoff fallback and offers an explicit,
+optional follow-up form. A submitted
+email is stored in a separate `human_handoffs` table together with the redacted
+query and its `trace_id`; it is not sent to the model and is not added to the
+knowledge base. Operators can review the private queue on the server:
+
+```bash
+PYTHONPATH=src .venv/bin/python -m campus_copilot.cli handoffs list --limit 20
+PYTHONPATH=src .venv/bin/python -m campus_copilot.cli handoffs show handoff_<id>
+```
+
+The endpoint requires same-origin browser submission, validates the email and
+trace, and limits each client to five submissions per hour. Human-follow-up
+records use the same retention period as traces. Because the address must remain
+usable for a reply, it is sensitive plaintext operational data: never place the
+runtime database under `web/`, commit it, or expose it through a public admin
+endpoint.
 
 When local evidence is insufficient, the answer plan can execute governed live
 retrieval. `config/web_sources.json` registers reviewed school and public

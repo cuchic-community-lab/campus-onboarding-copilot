@@ -11,6 +11,7 @@ data/raw/files/劳育劳动文化活动-《相关志愿时长记录》.xlsx
 data/raw/files/综合赋能-《集体活动参与加分》（2023级）.xlsx
 data/processed/
 data/index/
+data/runtime/
 data/official_sites/
 data/sync-report.json
 data/audit-report.json

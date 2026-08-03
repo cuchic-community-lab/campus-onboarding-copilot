@@ -11,7 +11,8 @@ from .retrieval import HybridRetriever
 from .service import corpus_stats
 from .web_retrieval import configured_web_retriever
 from .library import library_payload, resolve_library_file
-from .preview_security import PreviewGuard, login_page, parse_login_body, preview_status
+from .handoffs import SQLiteHandoffStore
+from .preview_security import PreviewGuard, SlidingWindowLimiter, login_page, parse_login_body, preview_status
 
 
 WEB_ROOT = PROJECT_ROOT / "web"
@@ -21,6 +22,8 @@ class AppHandler(BaseHTTPRequestHandler):
     retriever = HybridRetriever(DB_PATH)
     chat = GroundedChatService(retriever, web_retriever=configured_web_retriever())
     preview = PreviewGuard()
+    handoffs = SQLiteHandoffStore()
+    handoff_limiter = SlidingWindowLimiter()
 
     def end_headers(self) -> None:
         if self.preview.enabled:
@@ -143,9 +146,9 @@ class AppHandler(BaseHTTPRequestHandler):
                 self.send_header("Set-Cookie", self.preview.session_cookie(secure=secure))
                 self.end_headers()
                 return
-            if not self._protected(path, is_chat=path == "/api/chat"):
+            if not self._protected(path, is_chat=path in {"/api/chat", "/api/handoff"}):
                 return
-            if self.preview.enabled and not self.preview.same_origin(self.headers):
+            if self.headers.get("Origin") and not self.preview.same_origin(self.headers):
                 self._json({"error": "origin_rejected"}, 403)
                 return
             payload = self._read_json()
@@ -154,6 +157,19 @@ class AppHandler(BaseHTTPRequestHandler):
                 if session_id:
                     self.chat.reset(session_id)
                 self._json({"status": "ok", "session_id": session_id})
+                return
+            if path == "/api/handoff":
+                if not self.handoff_limiter.allow(
+                    "handoff:" + self._client_ip(), limit=5, window_seconds=3600
+                ):
+                    self._json({"error": "rate_limited"}, 429)
+                    return
+                result = self.handoffs.submit(
+                    email=str(payload.get("email") or ""),
+                    query=str(payload.get("query") or ""),
+                    trace_id=str(payload.get("trace_id") or ""),
+                )
+                self._json(result, 201)
                 return
             query = str(payload.get("query", "")).strip()
             if not query:
@@ -175,6 +191,7 @@ class AppHandler(BaseHTTPRequestHandler):
                     session_id=str(payload.get("session_id") or "") or None,
                     profile=payload.get("profile") or {},
                     top_k=top_k,
+                    trace_source="browser",
                 ))
             else:
                 self._json({"error": "not_found"}, 404)

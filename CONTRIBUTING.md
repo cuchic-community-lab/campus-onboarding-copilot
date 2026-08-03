@@ -16,6 +16,12 @@ both provenance and technical accountability.
 6. Open a pull request and complete the evidence, risk, and validation sections.
 7. Require at least one review from the other maintainer before merging.
 
+For every UI change, desktop and phone are co-equal acceptance surfaces. Follow
+the responsive quality gate in `AGENTS.md`, add regression coverage for both,
+and inspect the live application at desktop and phone viewports before review.
+Mobile clipping, unintended scrolling, missing disclosures, or behavior drift
+blocks completion.
+
 Direct pushes to `main` are not part of the collaboration workflow.
 
 ## Review ownership
@@ -42,4 +48,5 @@ maintainers confirm their accounts and ownership agreement.
 
 A pull request is ready only when its user-visible behavior, tests, evaluation
 impact, privacy implications, and fallback behavior are documented. Screenshots
-are useful for UI changes, but reproducible tests remain required.
+are useful for UI changes, but reproducible tests remain required. UI pull
+requests must include desktop and phone validation evidence.

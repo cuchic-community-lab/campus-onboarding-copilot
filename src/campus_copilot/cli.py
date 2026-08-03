@@ -1,8 +1,7 @@
 import argparse
 import json
-from pathlib import Path
 
-from .config import DB_PATH
+from .config import DB_PATH, TRACE_DB_PATH
 from .chat import GroundedChatService
 from .context_builder import build_context_packet
 from .evaluation import evaluate, evaluate_chat
@@ -12,6 +11,8 @@ from .service import audit_corpus, build_knowledge_base, corpus_stats
 from .sync import sync_corpus
 from .web_retrieval import configured_web_retriever
 from .official_sync import review_official_page, sync_official_sites
+from .tracing import SQLiteTraceStore
+from .handoffs import SQLiteHandoffStore
 
 
 def _print(value: object) -> None:
@@ -51,6 +52,20 @@ def main() -> None:
     review_group = official_review_parser.add_mutually_exclusive_group()
     review_group.add_argument("--approve")
     review_group.add_argument("--reject")
+    traces_parser = sub.add_parser("traces")
+    traces_sub = traces_parser.add_subparsers(dest="traces_command", required=True)
+    traces_list_parser = traces_sub.add_parser("list")
+    traces_list_parser.add_argument("--limit", type=int, default=20)
+    traces_list_parser.add_argument("--environment")
+    traces_list_parser.add_argument("--source")
+    traces_show_parser = traces_sub.add_parser("show")
+    traces_show_parser.add_argument("trace_id")
+    handoffs_parser = sub.add_parser("handoffs")
+    handoffs_sub = handoffs_parser.add_subparsers(dest="handoffs_command", required=True)
+    handoffs_list_parser = handoffs_sub.add_parser("list")
+    handoffs_list_parser.add_argument("--limit", type=int, default=20)
+    handoffs_show_parser = handoffs_sub.add_parser("show")
+    handoffs_show_parser.add_argument("handoff_id")
     args = parser.parse_args()
 
     if args.command == "sync":
@@ -65,7 +80,7 @@ def main() -> None:
         profile = {key: value for key, value in {"cohort": args.cohort, "major": args.major, "student_level": args.student_level}.items() if value}
         _print(GroundedChatService(
             HybridRetriever(DB_PATH), web_retriever=configured_web_retriever()
-        ).ask(args.query, profile=profile, top_k=args.top_k))
+        ).ask(args.query, profile=profile, top_k=args.top_k, trace_source="cli"))
     elif args.command == "serve":
         serve(args.host, args.port)
     elif args.command == "audit":
@@ -88,6 +103,28 @@ def main() -> None:
             _print(review_official_page(args.reject, "rejected"))
         else:
             _print(review_official_page())
+    elif args.command == "traces":
+        store = SQLiteTraceStore(TRACE_DB_PATH)
+        if args.traces_command == "list":
+            _print({
+                "database": str(TRACE_DB_PATH),
+                "filters": {"environment": args.environment, "source": args.source},
+                "traces": store.list_recent(args.limit, args.environment, args.source),
+            })
+        else:
+            trace = store.get(args.trace_id)
+            if trace is None:
+                parser.error(f"trace not found: {args.trace_id}")
+            _print(trace)
+    elif args.command == "handoffs":
+        store = SQLiteHandoffStore(TRACE_DB_PATH)
+        if args.handoffs_command == "list":
+            _print({"database": str(TRACE_DB_PATH), "handoffs": store.list_recent(args.limit)})
+        else:
+            handoff = store.get(args.handoff_id)
+            if handoff is None:
+                parser.error(f"handoff not found: {args.handoff_id}")
+            _print(handoff)
 
 
 if __name__ == "__main__":

@@ -1,5 +1,6 @@
 import re
 import threading
+import time
 import uuid
 from collections import OrderedDict
 from typing import Dict, List, Optional, Tuple
@@ -15,12 +16,18 @@ from .context_builder import build_context_packet
 from .answer_planning import build_answer_plan
 from .evidence_coverage import rank_and_filter_evidence
 from .web_retrieval import NullWebRetriever, WebRetriever
+from .tracing import TraceStore, configured_trace_store, trace_candidate
 
 
 FOLLOW_UP_MARKERS = ("那", "这个", "它", "还有", "上面", "刚才", "呢", "具体", "怎么办", "为什么")
 CORRECTION_PATTERNS = (
     re.compile(r"(?:我说的是|我是说|指的是|应该是)\s*([^，。！？；]+)"),
     re.compile(r"不是[^，。！？；]+[，,；;]\s*(?:是|而是)\s*([^，。！？；]+)"),
+)
+
+UNANSWERED_HANDOFF_MESSAGE = (
+    "抱歉啊，能力暂时回答不了，不过你可以留下你的邮箱，你这个问题将会有一位活的师哥/师姐回答，"
+    "或者你可以加一下我的制造者问一下，顺便骂一下他做的什么狗屎AI，他的微信是：RellFu。"
 )
 
 
@@ -76,6 +83,7 @@ class GroundedChatService:
         sessions: Optional[SessionStore] = None,
         provider_status: Optional[Dict[str, object]] = None,
         web_retriever: Optional[WebRetriever] = None,
+        trace_store: Optional[TraceStore] = None,
     ):
         if composer is None:
             composer, detected_status = configured_composer()
@@ -86,6 +94,14 @@ class GroundedChatService:
         self.provider_status = provider_status or {"mode": "custom", "adapter": composer.name}
         self.fallback = ExtractiveComposer()
         self.web_retriever = web_retriever or NullWebRetriever()
+        self.trace_store = trace_store or configured_trace_store()
+
+    def _record_trace(self, trace: Dict[str, object]) -> None:
+        try:
+            self.trace_store.record(trace)
+        except Exception:
+            # Observability must never break a student-facing answer.
+            return
 
     @staticmethod
     def _web_routes(fallback_route: str) -> List[str]:
@@ -169,107 +185,281 @@ class GroundedChatService:
         session_id: Optional[str] = None,
         profile: Optional[Dict[str, str]] = None,
         top_k: int = 6,
+        trace_source: str = "application",
     ) -> Dict[str, object]:
+        trace_id = "trace_" + uuid.uuid4().hex
+        started = time.perf_counter()
+        timings: Dict[str, int] = {}
+        stage = "initialize"
         session_id = session_id or uuid.uuid4().hex
-        history = self.sessions.history(session_id)
-        retrieval_query = contextualize_query(query, history)
+        retrieval_query = query
         effective_profile = dict(profile or {})
-        if "研究生" in query:
-            effective_profile["student_level"] = "graduate"
-        elif "本科" in query:
-            effective_profile["student_level"] = "undergraduate"
-        retrieval = self.retriever.search(retrieval_query, top_k, effective_profile)
-        if retrieval_query != query and retrieval.get("results"):
-            top_explanation = retrieval["results"][0].get("score_explanation", {})
-            coverage = top_explanation.get("concept_coverage")
-            if coverage is not None and float(coverage) < 0.6:
-                retrieval["answerability"] = "insufficient_contextual_evidence"
-                retrieval["insufficient_reason"] = "top_evidence_does_not_cover_enough_of_the_prior_topic"
-        retrieval = self._enrich_with_web(retrieval_query, retrieval, top_k)
-        retrieval["query"] = query
-        context = build_context_packet(retrieval, history)
-
-        warning: Optional[str] = None
+        local_candidates: List[Dict[str, object]] = []
+        retrieval: Dict[str, object] = {}
+        context: Dict[str, object] = {}
         composer_used = self.composer.name
-        if not context.get("can_generate"):
-            composition = self.fallback.generate(context)
-            composer_used = self.fallback.name
-        else:
-            try:
-                composition = self.composer.generate(context)
-                valid, errors = validate_composition(composition, context)
-                if not valid:
-                    warning = "model_output_failed_grounding_validation:" + ",".join(errors)
-                    composition = self.fallback.generate(context)
-                    composer_used = self.fallback.name
-            except Exception:
-                warning = "model_provider_unavailable_fallback_used"
+        warning: Optional[str] = None
+        validation_status = "not_run"
+        validation_errors: List[str] = []
+        model_attempted = False
+        model_response: Optional[Dict[str, object]] = None
+        try:
+            history = self.sessions.history(session_id)
+            retrieval_query = contextualize_query(query, history)
+            if "研究生" in query:
+                effective_profile["student_level"] = "graduate"
+            elif "本科" in query:
+                effective_profile["student_level"] = "undergraduate"
+
+            stage = "local_retrieval"
+            phase_started = time.perf_counter()
+            retrieval = self.retriever.search(retrieval_query, top_k, effective_profile)
+            timings[stage] = round((time.perf_counter() - phase_started) * 1000)
+            local_candidates = list(retrieval.get("results", []))
+            if retrieval_query != query and retrieval.get("results"):
+                top_explanation = retrieval["results"][0].get("score_explanation", {})
+                coverage = top_explanation.get("concept_coverage")
+                if coverage is not None and float(coverage) < 0.6:
+                    retrieval["answerability"] = "insufficient_contextual_evidence"
+                    retrieval["insufficient_reason"] = "top_evidence_does_not_cover_enough_of_the_prior_topic"
+
+            stage = "web_enrichment"
+            phase_started = time.perf_counter()
+            retrieval = self._enrich_with_web(retrieval_query, retrieval, top_k)
+            timings[stage] = round((time.perf_counter() - phase_started) * 1000)
+            retrieval["query"] = query
+
+            stage = "context_build"
+            phase_started = time.perf_counter()
+            context = build_context_packet(retrieval, history)
+            timings[stage] = round((time.perf_counter() - phase_started) * 1000)
+
+            stage = "model_generation"
+            phase_started = time.perf_counter()
+            if not context.get("can_generate"):
                 composition = self.fallback.generate(context)
                 composer_used = self.fallback.name
+                validation_status = "skipped_insufficient_evidence"
+            else:
+                try:
+                    model_attempted = self.composer.name != self.fallback.name
+                    composition = self.composer.generate(context)
+                    if model_attempted:
+                        model_response = {
+                            "answer": composition.get("answer"),
+                            "citations": composition.get("citations", []),
+                            "unresolved": composition.get("unresolved", []),
+                        }
+                    valid, validation_errors = validate_composition(composition, context)
+                    validation_status = "passed" if valid else "failed"
+                    if not valid:
+                        warning = "model_output_failed_grounding_validation:" + ",".join(validation_errors)
+                        composition = self.fallback.generate(context)
+                        composer_used = self.fallback.name
+                except Exception as exc:
+                    validation_status = "provider_error"
+                    validation_errors = [exc.__class__.__name__]
+                    warning = "model_provider_unavailable_fallback_used"
+                    composition = self.fallback.generate(context)
+                    composer_used = self.fallback.name
+            timings[stage] = round((time.perf_counter() - phase_started) * 1000)
 
-        citations = [str(item) for item in composition.get("citations", [])]
-        self.sessions.append(session_id, query, str(composition["answer"]), citations)
-        cited = set(citations)
-        sources = [
-            item for item in context["evidence"]
-            if str(item.get("evidence_id")) in cited
-        ]
-        answer_plan = context["answer_plan"]
-        source_origins = {str(item.get("retrieval_origin", "local_knowledge")) for item in sources}
-        autonomous_used = "autonomous_search" in source_origins
-        registered_web_used = bool(source_origins.intersection({"live_web", "verified_web_snapshot"}))
-        local_status = str(retrieval.get("local_answerability_before_web", retrieval.get("answerability", "")))
-        local_source_used = "local_knowledge" in source_origins
-        local_insufficient = (
-            local_status.startswith("insufficient")
-            or local_status == "unverified"
-            or ((autonomous_used or registered_web_used) and not local_source_used)
-        )
-        discovery_executed = bool(answer_plan.get("web_discovery_executed"))
-        if autonomous_used:
-            provenance_notice = "我在知识库里没有找到足以回答这个问题的内容，下面的回答来自本轮联网搜索。"
-            provenance_mode = "autonomous_web_fallback"
-        elif registered_web_used and local_insufficient:
-            provenance_notice = "我在知识库里没有找到足够材料，下面参考的是已登记并核验过的网页来源，不是本轮自主搜索。"
-            provenance_mode = "registered_web_fallback"
-        elif discovery_executed and not autonomous_used:
-            provenance_notice = "我在知识库和本轮联网搜索中都没有找到足够可靠的内容，因此没有根据相似材料下结论。"
-            provenance_mode = "web_search_insufficient"
-        elif local_insufficient:
-            provenance_notice = "我在知识库里没有找到足够材料，而且当前自主网页搜索尚未启用。"
-            provenance_mode = "search_unavailable"
-        else:
-            provenance_notice = "这次回答主要依据当前知识库中的材料。"
-            provenance_mode = "local_knowledge"
-        needs_handoff = provenance_mode in {
-            "web_search_insufficient", "search_unavailable", "registered_web_fallback",
-        } or bool(composition.get("unresolved"))
-        human_handoff = self._human_handoff(str(answer_plan.get("question_type", "campus_fact"))) if needs_handoff else ""
-        return {
-            "session_id": session_id,
-            "query": query,
-            "retrieval_query": retrieval_query,
-            "answer": composition["answer"],
-            "display_answer": display_answer(str(composition["answer"])),
-            "citations": citations,
-            "claims": composition.get("claims", []),
-            "unresolved": composition.get("unresolved", []),
-            "answerability": retrieval["answerability"],
-            "composer": composer_used,
-            "composer_warning": warning,
-            "evidence": context["evidence"],
-            "sources": sources,
-            "answer_plan": answer_plan,
-            "provenance": {
-                "mode": provenance_mode,
-                "notice": provenance_notice,
-                "knowledge_base_sufficient": not local_insufficient,
-                "autonomous_search_executed": discovery_executed,
-                "autonomous_search_used": autonomous_used,
-            },
-            "human_handoff": human_handoff,
-            "conversation_turns": len(history) // 2 + 1,
-        }
+            stage = "postprocessing"
+            phase_started = time.perf_counter()
+            citations = [str(item) for item in composition.get("citations", [])]
+            self.sessions.append(session_id, query, str(composition["answer"]), citations)
+            cited = set(citations)
+            sources = [
+                item for item in context["evidence"]
+                if str(item.get("evidence_id")) in cited
+            ]
+            final_answerability = str(retrieval.get("answerability", ""))
+            core_question_unresolved = (
+                final_answerability.startswith("insufficient")
+                or final_answerability in {
+                    "unverified",
+                    "supported_with_unresolved_wording",
+                    "supported_with_unresolved_exclusivity",
+                }
+            )
+            answer_useful = bool(
+                sources and composition.get("claims") and not core_question_unresolved
+            )
+            answer_plan = context["answer_plan"]
+            source_origins = {str(item.get("retrieval_origin", "local_knowledge")) for item in sources}
+            autonomous_used = "autonomous_search" in source_origins
+            registered_web_used = bool(source_origins.intersection({"live_web", "verified_web_snapshot"}))
+            local_status = str(retrieval.get("local_answerability_before_web", retrieval.get("answerability", "")))
+            local_source_used = "local_knowledge" in source_origins
+            local_insufficient = (
+                local_status.startswith("insufficient")
+                or local_status == "unverified"
+                or ((autonomous_used or registered_web_used) and not local_source_used)
+            )
+            discovery_executed = bool(answer_plan.get("web_discovery_executed"))
+            if autonomous_used:
+                provenance_notice = "我在知识库里没有找到足以回答这个问题的内容，下面的回答来自本轮联网搜索。"
+                provenance_mode = "autonomous_web_fallback"
+            elif registered_web_used and local_insufficient:
+                provenance_notice = "我在知识库里没有找到足够材料，下面参考的是已登记并核验过的网页来源，不是本轮自主搜索。"
+                provenance_mode = "registered_web_fallback"
+            elif discovery_executed and not autonomous_used:
+                provenance_notice = "我在知识库和本轮联网搜索中都没有找到足够可靠的内容，因此没有根据相似材料下结论。"
+                provenance_mode = "web_search_insufficient"
+            elif local_insufficient:
+                provenance_notice = "我在知识库里没有找到足够材料，而且当前自主网页搜索尚未启用。"
+                provenance_mode = "search_unavailable"
+            else:
+                provenance_notice = "这次回答主要依据当前知识库中的材料。"
+                provenance_mode = "local_knowledge"
+            needs_handoff = not answer_useful or provenance_mode in {
+                "web_search_insufficient", "search_unavailable", "registered_web_fallback",
+            } or bool(composition.get("unresolved"))
+            human_handoff = self._human_handoff(str(answer_plan.get("question_type", "campus_fact"))) if needs_handoff else ""
+            handoff_available = not answer_useful and self.trace_store.enabled
+            student_answer = display_answer(str(composition["answer"]))
+            if not answer_useful:
+                student_answer = UNANSWERED_HANDOFF_MESSAGE
+            response = {
+                "trace_id": trace_id,
+                "session_id": session_id,
+                "query": query,
+                "retrieval_query": retrieval_query,
+                "answer": composition["answer"],
+                "display_answer": student_answer,
+                "citations": citations,
+                "claims": composition.get("claims", []),
+                "unresolved": composition.get("unresolved", []),
+                "answerability": retrieval["answerability"],
+                "composer": composer_used,
+                "composer_warning": warning,
+                "evidence": context["evidence"],
+                "sources": sources,
+                "answer_plan": answer_plan,
+                "provenance": {
+                    "mode": provenance_mode,
+                    "notice": provenance_notice,
+                    "knowledge_base_sufficient": not local_insufficient,
+                    "autonomous_search_executed": discovery_executed,
+                    "autonomous_search_used": autonomous_used,
+                },
+                "human_handoff": human_handoff,
+                "handoff_available": handoff_available,
+                "answer_useful": answer_useful,
+                "conversation_turns": len(history) // 2 + 1,
+            }
+            timings[stage] = round((time.perf_counter() - phase_started) * 1000)
+            timings["total"] = round((time.perf_counter() - started) * 1000)
+
+            final_candidates = list(retrieval.get("results", []))
+            selected_ids = set(citations)
+            selected_evidence = [
+                {"evidence_id": item.get("evidence_id"), "title": item.get("title"),
+                 "authority_tier": item.get("authority_tier"),
+                 "retrieval_origin": item.get("retrieval_origin", "local_knowledge")}
+                for item in sources
+            ]
+            rejected_evidence = [
+                {"evidence_id": f"S{index}", "title": item.get("title"),
+                 "reason": "not_cited_in_final_answer"}
+                for index, item in enumerate(final_candidates, start=1)
+                if f"S{index}" not in selected_ids
+            ]
+            final_keys = {(item.get("chunk_id"), item.get("title")) for item in final_candidates}
+            rejected_evidence.extend(
+                {"chunk_id": item.get("chunk_id"), "title": item.get("title"),
+                 "reason": "replaced_or_filtered_during_web_arbitration"}
+                for item in local_candidates
+                if (item.get("chunk_id"), item.get("title")) not in final_keys
+            )
+            self._record_trace({
+                "trace_id": trace_id,
+                "source": trace_source,
+                "session_id": session_id,
+                "query": {
+                    "original": query,
+                    "retrieval_query": retrieval_query,
+                    "question_type": answer_plan.get("question_type"),
+                    "conversation_turn": len(history) // 2 + 1,
+                    "profile": effective_profile,
+                },
+                "retrieval": {
+                    "retrieval_mode": retrieval.get("retrieval_mode"),
+                    "local_answerability": retrieval.get("local_answerability_before_web", retrieval.get("answerability")),
+                    "answerability": retrieval.get("answerability"),
+                    "insufficient_reason": retrieval.get("insufficient_reason"),
+                    "local_candidates": [trace_candidate(item, index) for index, item in enumerate(local_candidates, 1)],
+                    "final_candidates": [trace_candidate(item, index) for index, item in enumerate(final_candidates, 1)],
+                    "web_search": retrieval.get("web_search") or {"executed": False},
+                    "selected_evidence": selected_evidence,
+                    "rejected_evidence": rejected_evidence,
+                },
+                "llm": {
+                    "provider": self.provider_status.get("provider"),
+                    "model": self.provider_status.get("model"),
+                    "adapter": self.provider_status.get("adapter"),
+                    "model_attempted": model_attempted,
+                    "composer_requested": self.composer.name,
+                    "composer_used": composer_used,
+                    "fallback_used": composer_used == self.fallback.name,
+                    "warning": warning,
+                    "contract_version": context.get("model_contract_version"),
+                    "input": {
+                        "question_type": answer_plan.get("question_type"),
+                        "evidence_ids": [item.get("evidence_id") for item in context.get("evidence", [])],
+                        "history_messages": len(history),
+                    },
+                    "attempted_response": model_response,
+                },
+                "validation": {
+                    "status": validation_status,
+                    "errors": validation_errors,
+                    "can_generate": bool(context.get("can_generate")),
+                },
+                "response": {
+                    "status": "completed",
+                    "answer": response["display_answer"],
+                    "citations": citations,
+                    "unresolved": response["unresolved"],
+                    "provenance": response["provenance"],
+                    "human_handoff": human_handoff,
+                    "handoff_available": handoff_available,
+                    "answer_useful": answer_useful,
+                },
+                "timings_ms": timings,
+                "error": None,
+            })
+            return response
+        except Exception as exc:
+            timings["total"] = round((time.perf_counter() - started) * 1000)
+            self._record_trace({
+                "trace_id": trace_id,
+                "source": trace_source,
+                "session_id": session_id,
+                "query": {
+                    "original": query,
+                    "retrieval_query": retrieval_query,
+                    "question_type": (context.get("answer_plan") or {}).get("question_type"),
+                    "profile": effective_profile,
+                },
+                "retrieval": {
+                    "answerability": retrieval.get("answerability"),
+                    "local_candidates": [trace_candidate(item, index) for index, item in enumerate(local_candidates, 1)],
+                    "web_search": retrieval.get("web_search") or {"executed": False},
+                },
+                "llm": {
+                    "provider": self.provider_status.get("provider"),
+                    "model": self.provider_status.get("model"),
+                    "composer_requested": self.composer.name,
+                    "composer_used": composer_used,
+                    "model_attempted": model_attempted,
+                },
+                "validation": {"status": validation_status, "errors": validation_errors},
+                "response": {"status": "failed"},
+                "timings_ms": timings,
+                "error": {"stage": stage, "exception_class": exc.__class__.__name__},
+            })
+            raise
 
     def reset(self, session_id: str) -> None:
         self.sessions.reset(session_id)
@@ -277,4 +467,5 @@ class GroundedChatService:
     def status(self) -> Dict[str, object]:
         status = dict(self.provider_status)
         status["web_retrieval"] = self.web_retriever.status()
+        status["tracing"] = {"enabled": self.trace_store.enabled}
         return status
