@@ -140,6 +140,21 @@ class FrontendContractTest(unittest.TestCase):
             self.assertIn(contract, self.html)
         self.assertNotIn("box-shadow:var(--focus),0 12px 36px", self.html)
 
+    def test_mobile_guided_placeholder_is_short_but_sends_full_question(self):
+        for contract in (
+            "const mobileGuidedPrompts=",
+            "'陵水带什么衣服？'",
+            "'摆渡车怎么坐？'",
+            "function guidedPlaceholder(){return mobileDrawer.matches?mobileGuidedPrompts[guidedIndex%mobileGuidedPrompts.length]:`试着问：${guidedQuestion()}`}",
+            "$('#chatInput').placeholder=guidedPlaceholder()",
+            "const q=explicitQuestion.trim()||input.value.trim()||guidedQuestion()",
+            "}updateInputGuide();if(suggestionItems.length",
+            "mobileDrawer.addEventListener('change',syncDrawerMode)",
+        ):
+            self.assertIn(contract, self.html)
+        self.assertIn("'陵水天气需要准备什么衣服？'", self.html)
+        self.assertIn("'校园摆渡车怎么坐？'", self.html)
+
     def test_mobile_and_desktop_quality_gate_is_durable(self):
         rules = PROJECT_AGENTS.read_text(encoding="utf-8")
         for contract in (
