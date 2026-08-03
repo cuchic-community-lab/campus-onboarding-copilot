@@ -25,6 +25,11 @@ CORRECTION_PATTERNS = (
     re.compile(r"不是[^，。！？；]+[，,；;]\s*(?:是|而是)\s*([^，。！？；]+)"),
 )
 
+UNANSWERED_HANDOFF_MESSAGE = (
+    "抱歉啊，能力暂时回答不了，不过你可以留下你的邮箱，你这个问题将会有一位活的师哥/师姐回答，"
+    "或者你可以加一下我的制造者问一下，顺便骂一下他做的什么狗屎AI，他的微信是：RellFu。"
+)
+
 
 class SessionStore:
     def __init__(self, max_turns: int = 4, max_sessions: int = 500):
@@ -267,6 +272,18 @@ class GroundedChatService:
                 item for item in context["evidence"]
                 if str(item.get("evidence_id")) in cited
             ]
+            final_answerability = str(retrieval.get("answerability", ""))
+            core_question_unresolved = (
+                final_answerability.startswith("insufficient")
+                or final_answerability in {
+                    "unverified",
+                    "supported_with_unresolved_wording",
+                    "supported_with_unresolved_exclusivity",
+                }
+            )
+            answer_useful = bool(
+                sources and composition.get("claims") and not core_question_unresolved
+            )
             answer_plan = context["answer_plan"]
             source_origins = {str(item.get("retrieval_origin", "local_knowledge")) for item in sources}
             autonomous_used = "autonomous_search" in source_origins
@@ -294,20 +311,14 @@ class GroundedChatService:
             else:
                 provenance_notice = "这次回答主要依据当前知识库中的材料。"
                 provenance_mode = "local_knowledge"
-            needs_handoff = provenance_mode in {
+            needs_handoff = not answer_useful or provenance_mode in {
                 "web_search_insufficient", "search_unavailable", "registered_web_fallback",
             } or bool(composition.get("unresolved"))
             human_handoff = self._human_handoff(str(answer_plan.get("question_type", "campus_fact"))) if needs_handoff else ""
-            handoff_available = (
-                provenance_mode in {"web_search_insufficient", "search_unavailable"}
-                and self.trace_store.enabled
-            )
+            handoff_available = not answer_useful and self.trace_store.enabled
             student_answer = display_answer(str(composition["answer"]))
-            if handoff_available:
-                student_answer = (
-                    "抱歉啊，我暂时回答不了。不过你可以留下邮箱，这个问题会由一位活的师哥或师姐回答；"
-                    "或者加一下我的制造者问问，顺便骂一下他做的什么狗屎 AI。他的微信是：RellFu。"
-                )
+            if not answer_useful:
+                student_answer = UNANSWERED_HANDOFF_MESSAGE
             response = {
                 "trace_id": trace_id,
                 "session_id": session_id,
@@ -333,6 +344,7 @@ class GroundedChatService:
                 },
                 "human_handoff": human_handoff,
                 "handoff_available": handoff_available,
+                "answer_useful": answer_useful,
                 "conversation_turns": len(history) // 2 + 1,
             }
             timings[stage] = round((time.perf_counter() - phase_started) * 1000)
@@ -410,6 +422,7 @@ class GroundedChatService:
                     "provenance": response["provenance"],
                     "human_handoff": human_handoff,
                     "handoff_available": handoff_available,
+                    "answer_useful": answer_useful,
                 },
                 "timings_ms": timings,
                 "error": None,

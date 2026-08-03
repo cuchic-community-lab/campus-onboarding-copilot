@@ -189,8 +189,10 @@ CAMPUS_TRACE_DB_PATH=/absolute/local/path/rag_traces.db
 For a public deployment, keep this database outside the web root, restrict
 operator access, and set a retention period appropriate to the privacy policy.
 
-When an answer has neither sufficient knowledge-base evidence nor a usable web
-fallback, the UI offers an explicit, optional human follow-up form. A submitted
+When the final answer cannot provide both cited evidence and a supported useful
+conclusion—including partial web results that do not resolve the core
+question—the UI uses the standard human-handoff fallback and offers an explicit,
+optional follow-up form. A submitted
 email is stored in a separate `human_handoffs` table together with the redacted
 query and its `trace_id`; it is not sent to the model and is not added to the
 knowledge base. Operators can review the private queue on the server:
