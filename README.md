@@ -94,6 +94,13 @@ make demo       # run an uncertainty-sensitive example query
 make serve      # open http://127.0.0.1:8000
 ```
 
+For the reviewed single-server production baseline, see
+[`deploy/README.md`](deploy/README.md). It provides a non-root application
+container, Caddy HTTPS termination, health checks, automatic restart, public
+chat rate limiting, and a persistent private volume for traces and opt-in email
+handoffs. Real credentials remain in the ignored `deploy/.env.production` file
+on the server.
+
 For a short-lived remote preview, set a strong one-time access code before
 starting the server. This enables a login gate, signed four-hour HttpOnly
 cookie, same-origin POST checks, per-client login/chat rate limits, no-store

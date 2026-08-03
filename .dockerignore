@@ -1,0 +1,17 @@
+.git
+.github
+.venv
+.env.local
+.env.production
+deploy/.env.production
+__pycache__
+*.py[cod]
+*.log
+.DS_Store
+data/index
+data/processed
+data/runtime
+data/official_sites
+data/sync-report.json
+data/audit-report.json
+08_operations
