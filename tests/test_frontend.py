@@ -193,12 +193,13 @@ class FrontendContractTest(unittest.TestCase):
             'class="handoff-email"',
             'type="email"',
             'autocomplete="email"',
-            "仅用于回复本次问题，保留 30 天",
-            "不会发送给大模型或加入知识库",
+            "留下邮箱后，我们会尽快回复。如果没人回，也可以加 RellFu，把他骂一顿。",
             "submitHandoff",
             "trace_id:form.dataset.traceId",
         ):
             self.assertIn(contract, self.html)
+        self.assertNotIn('class="handoff-privacy"', self.html)
+        self.assertNotIn("仅用于回复本次问题，保留 30 天", self.html)
 
     def test_direct_file_open_redirects_to_the_loopback_service(self):
         self.assertIn("location.protocol==='file:'", self.html)
