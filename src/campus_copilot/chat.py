@@ -185,6 +185,7 @@ class GroundedChatService:
         session_id: Optional[str] = None,
         profile: Optional[Dict[str, str]] = None,
         top_k: int = 6,
+        trace_source: str = "application",
     ) -> Dict[str, object]:
         trace_id = "trace_" + uuid.uuid4().hex
         started = time.perf_counter()
@@ -373,6 +374,7 @@ class GroundedChatService:
             )
             self._record_trace({
                 "trace_id": trace_id,
+                "source": trace_source,
                 "session_id": session_id,
                 "query": {
                     "original": query,
@@ -432,6 +434,7 @@ class GroundedChatService:
             timings["total"] = round((time.perf_counter() - started) * 1000)
             self._record_trace({
                 "trace_id": trace_id,
+                "source": trace_source,
                 "session_id": session_id,
                 "query": {
                     "original": query,

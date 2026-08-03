@@ -74,11 +74,14 @@ class TracingTest(unittest.TestCase):
         response = service.ask(
             "我的邮箱 student@example.com，宿舍是几人间？",
             session_id="private-session-id",
+            trace_source="browser",
         )
         trace = store.get(response["trace_id"])
 
         self.assertIsNotNone(trace)
         self.assertEqual(trace["trace_id"], response["trace_id"])
+        self.assertEqual(trace["environment"], "development")
+        self.assertEqual(trace["source"], "browser")
         self.assertNotIn("student@example.com", trace["query"]["original"])
         self.assertNotEqual(trace["anonymous_session_id"], "private-session-id")
         self.assertEqual(trace["retrieval"]["retrieval_mode"], "fake_hybrid")
@@ -89,6 +92,37 @@ class TracingTest(unittest.TestCase):
         self.assertEqual(trace["validation"]["status"], "passed")
         self.assertEqual(trace["response"]["status"], "completed")
         self.assertGreaterEqual(trace["timings_ms"]["total"], 0)
+
+        summary = store.list_recent(1, environment="development", source="browser")[0]
+        self.assertEqual(summary["trace_id"], response["trace_id"])
+        self.assertEqual(store.list_recent(1, source="evaluation"), [])
+
+    def test_existing_database_migrates_and_marks_old_rows_as_legacy(self):
+        with sqlite3.connect(self.database) as connection:
+            connection.execute(
+                """CREATE TABLE rag_traces (
+                       trace_id TEXT PRIMARY KEY,
+                       created_at TEXT NOT NULL,
+                       anonymous_session_id TEXT,
+                       question_type TEXT,
+                       answerability TEXT,
+                       composer TEXT,
+                       status TEXT NOT NULL,
+                       total_latency_ms INTEGER,
+                       query_preview TEXT NOT NULL,
+                       payload_json TEXT NOT NULL
+                   )"""
+            )
+            connection.execute(
+                """INSERT INTO rag_traces
+                   (trace_id, created_at, status, query_preview, payload_json)
+                   VALUES ('trace_old', '2026-08-01T00:00:00+00:00', 'completed', 'old', '{}')"""
+            )
+
+        store = SQLiteTraceStore(self.database)
+        summary = store.list_recent(1)[0]
+        self.assertEqual(summary["environment"], "legacy")
+        self.assertEqual(summary["source"], "legacy")
 
     def test_failure_trace_records_stage_without_exception_message(self):
         store = SQLiteTraceStore(self.database)

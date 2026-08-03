@@ -56,6 +56,8 @@ def main() -> None:
     traces_sub = traces_parser.add_subparsers(dest="traces_command", required=True)
     traces_list_parser = traces_sub.add_parser("list")
     traces_list_parser.add_argument("--limit", type=int, default=20)
+    traces_list_parser.add_argument("--environment")
+    traces_list_parser.add_argument("--source")
     traces_show_parser = traces_sub.add_parser("show")
     traces_show_parser.add_argument("trace_id")
     handoffs_parser = sub.add_parser("handoffs")
@@ -78,7 +80,7 @@ def main() -> None:
         profile = {key: value for key, value in {"cohort": args.cohort, "major": args.major, "student_level": args.student_level}.items() if value}
         _print(GroundedChatService(
             HybridRetriever(DB_PATH), web_retriever=configured_web_retriever()
-        ).ask(args.query, profile=profile, top_k=args.top_k))
+        ).ask(args.query, profile=profile, top_k=args.top_k, trace_source="cli"))
     elif args.command == "serve":
         serve(args.host, args.port)
     elif args.command == "audit":
@@ -104,7 +106,11 @@ def main() -> None:
     elif args.command == "traces":
         store = SQLiteTraceStore(TRACE_DB_PATH)
         if args.traces_command == "list":
-            _print({"database": str(TRACE_DB_PATH), "traces": store.list_recent(args.limit)})
+            _print({
+                "database": str(TRACE_DB_PATH),
+                "filters": {"environment": args.environment, "source": args.source},
+                "traces": store.list_recent(args.limit, args.environment, args.source),
+            })
         else:
             trace = store.get(args.trace_id)
             if trace is None:

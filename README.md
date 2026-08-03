@@ -177,6 +177,18 @@ campus-copilot traces list --limit 20
 campus-copilot traces show trace_<id>
 ```
 
+Each new trace includes `environment` and `source`. Browser traffic is labeled
+`browser`, command-line chat is `cli`, and contract evaluation is `evaluation`.
+Filter the operator list when reviewing real traffic:
+
+```bash
+campus-copilot traces list --environment production --source browser --limit 50
+```
+
+Set `CAMPUS_ENVIRONMENT=production` in the deployed server environment. Local
+development defaults to `development`; rows created before this metadata was
+introduced are preserved and labeled `legacy`.
+
 Tracing is enabled by default for development and retained for 30 days. Change
 the local behavior without editing code:
 
@@ -184,6 +196,7 @@ the local behavior without editing code:
 CAMPUS_TRACE_ENABLED=0
 CAMPUS_TRACE_RETENTION_DAYS=30
 CAMPUS_TRACE_DB_PATH=/absolute/local/path/rag_traces.db
+CAMPUS_ENVIRONMENT=development
 ```
 
 For a public deployment, keep this database outside the web root, restrict

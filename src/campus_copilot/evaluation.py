@@ -60,7 +60,12 @@ def evaluate_chat(path: Path = DEFAULT_GOLDEN_SET) -> Dict[str, object]:
     details: List[Dict[str, object]] = []
     citation_hits = refusal_hits = experience_hits = direct_answer_hits = 0
     for case in cases:
-        result = service.ask(str(case["query"]), profile=case.get("profile") or {}, top_k=5)
+        result = service.ask(
+            str(case["query"]),
+            profile=case.get("profile") or {},
+            top_k=5,
+            trace_source="evaluation",
+        )
         evidence_ids = {str(item["evidence_id"]) for item in result["evidence"]}
         citations = result["citations"]
         citation_ok = all(item in evidence_ids for item in citations)

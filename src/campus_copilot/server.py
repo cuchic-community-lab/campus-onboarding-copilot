@@ -191,6 +191,7 @@ class AppHandler(BaseHTTPRequestHandler):
                     session_id=str(payload.get("session_id") or "") or None,
                     profile=payload.get("profile") or {},
                     top_k=top_k,
+                    trace_source="browser",
                 ))
             else:
                 self._json({"error": "not_found"}, 404)

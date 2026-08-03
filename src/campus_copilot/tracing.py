@@ -79,7 +79,12 @@ class TraceStore(Protocol):
     def record(self, trace: Dict[str, object]) -> str:
         ...
 
-    def list_recent(self, limit: int = 20) -> List[Dict[str, object]]:
+    def list_recent(
+        self,
+        limit: int = 20,
+        environment: Optional[str] = None,
+        source: Optional[str] = None,
+    ) -> List[Dict[str, object]]:
         ...
 
     def get(self, trace_id: str) -> Optional[Dict[str, object]]:
@@ -92,7 +97,12 @@ class NullTraceStore:
     def record(self, trace: Dict[str, object]) -> str:
         return str(trace.get("trace_id") or "")
 
-    def list_recent(self, limit: int = 20) -> List[Dict[str, object]]:
+    def list_recent(
+        self,
+        limit: int = 20,
+        environment: Optional[str] = None,
+        source: Optional[str] = None,
+    ) -> List[Dict[str, object]]:
         return []
 
     def get(self, trace_id: str) -> Optional[Dict[str, object]]:
@@ -122,6 +132,8 @@ class SQLiteTraceStore:
                 """CREATE TABLE IF NOT EXISTS rag_traces (
                        trace_id TEXT PRIMARY KEY,
                        created_at TEXT NOT NULL,
+                       environment TEXT NOT NULL DEFAULT 'legacy',
+                       source TEXT NOT NULL DEFAULT 'legacy',
                        anonymous_session_id TEXT,
                        question_type TEXT,
                        answerability TEXT,
@@ -132,8 +144,23 @@ class SQLiteTraceStore:
                        payload_json TEXT NOT NULL
                    )"""
             )
+            columns = {
+                str(row[1]) for row in connection.execute("PRAGMA table_info(rag_traces)")
+            }
+            if "environment" not in columns:
+                connection.execute(
+                    "ALTER TABLE rag_traces ADD COLUMN environment TEXT NOT NULL DEFAULT 'legacy'"
+                )
+            if "source" not in columns:
+                connection.execute(
+                    "ALTER TABLE rag_traces ADD COLUMN source TEXT NOT NULL DEFAULT 'legacy'"
+                )
             connection.execute(
                 "CREATE INDEX IF NOT EXISTS idx_rag_traces_created_at ON rag_traces(created_at DESC)"
+            )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_rag_traces_environment_source "
+                "ON rag_traces(environment, source, created_at DESC)"
             )
 
     def purge_expired(self) -> int:
@@ -149,6 +176,10 @@ class SQLiteTraceStore:
         raw_session = str(prepared.pop("session_id", "") or "")
         prepared["trace_id"] = trace_id
         prepared["created_at"] = created_at
+        prepared["environment"] = str(
+            prepared.get("environment") or os.getenv("CAMPUS_ENVIRONMENT", "development")
+        ).strip().lower()[:40]
+        prepared["source"] = str(prepared.get("source") or "application").strip().lower()[:40]
         prepared["anonymous_session_id"] = anonymous_session_id(raw_session)
         clean = sanitize(prepared)
         assert isinstance(clean, dict)
@@ -162,12 +193,15 @@ class SQLiteTraceStore:
         with self._lock, self._connect() as connection:
             connection.execute(
                 """INSERT OR REPLACE INTO rag_traces
-                   (trace_id, created_at, anonymous_session_id, question_type, answerability,
-                    composer, status, total_latency_ms, query_preview, payload_json)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                   (trace_id, created_at, environment, source, anonymous_session_id,
+                    question_type, answerability, composer, status, total_latency_ms,
+                    query_preview, payload_json)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     trace_id,
                     created_at,
+                    str(clean.get("environment") or "development"),
+                    str(clean.get("source") or "application"),
                     str(clean.get("anonymous_session_id") or ""),
                     str(query.get("question_type") or ""),
                     str(retrieval.get("answerability") or ""),
@@ -181,14 +215,30 @@ class SQLiteTraceStore:
         self.purge_expired()
         return trace_id
 
-    def list_recent(self, limit: int = 20) -> List[Dict[str, object]]:
+    def list_recent(
+        self,
+        limit: int = 20,
+        environment: Optional[str] = None,
+        source: Optional[str] = None,
+    ) -> List[Dict[str, object]]:
         limit = max(1, min(int(limit), 200))
+        clauses: List[str] = []
+        parameters: List[object] = []
+        if environment:
+            clauses.append("environment = ?")
+            parameters.append(environment.strip().lower())
+        if source:
+            clauses.append("source = ?")
+            parameters.append(source.strip().lower())
+        where = " WHERE " + " AND ".join(clauses) if clauses else ""
+        parameters.append(limit)
         with self._connect() as connection:
             rows = connection.execute(
-                """SELECT trace_id, created_at, anonymous_session_id, question_type,
+                """SELECT trace_id, created_at, environment, source,
+                          anonymous_session_id, question_type,
                           answerability, composer, status, total_latency_ms, query_preview
-                   FROM rag_traces ORDER BY created_at DESC LIMIT ?""",
-                (limit,),
+                   FROM rag_traces""" + where + " ORDER BY created_at DESC LIMIT ?",
+                parameters,
             ).fetchall()
         return [dict(row) for row in rows]
 
