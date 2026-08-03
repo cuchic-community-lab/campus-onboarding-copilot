@@ -147,10 +147,15 @@ def chunk_structured_rows(document: DocumentRecord) -> List[ChunkRecord]:
 
 
 def chunk_document(document: DocumentRecord) -> List[ChunkRecord]:
-    if document.source_kind in {"official_link", "community_link", "form"}:
+    if document.source_kind in {"official_link", "community_link", "form", "qr_resource"}:
         if not document.content:
             return []
         return [_make_chunk(document, document.content, 0, "resource")]
+    if document.parse_status == "ocr_required" and document.media_type == "image":
+        # Images are thumbnailable evidence but not assertable until OCR.
+        if not document.content:
+            return []
+        return [_make_chunk(document, document.content, 0, "visual_reference")]
     if document.parse_status != "parsed":
         return []
     if document.media_type == "excel":

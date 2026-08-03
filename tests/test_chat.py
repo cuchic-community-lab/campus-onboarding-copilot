@@ -84,7 +84,7 @@ class ChatTest(unittest.TestCase):
         result = service.ask("那研究生呢？", session_id="test")
         self.assertEqual(result["answerability"], "insufficient_contextual_evidence")
         self.assertEqual(result["citations"], [])
-        self.assertIn("不能把其他相似内容当成答案", result["answer"])
+        self.assertIn("问师哥师姐", result["answer"])
 
 
 if __name__ == "__main__":

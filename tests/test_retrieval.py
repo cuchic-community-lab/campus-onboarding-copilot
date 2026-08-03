@@ -67,12 +67,23 @@ class RetrievalTest(unittest.TestCase):
                 media_type="markdown", source_kind="peer_faq", authority_tier="peer_experience",
                 assertion_policy="label_as_experience", parse_status="parsed",
             )
-            chunk = ChunkRecord(
-                chunk_id="c1", document_id="d1", title="宿舍问答", text="问题：宿舍是几人间？ 回答：目前大概率四人寝两人住。",
-                chunk_type="faq", sequence=0, authority_tier="peer_experience",
-                assertion_policy="label_as_experience", source_url=doc.source_url, uncertainty=["大概率"],
-            )
-            rebuild(path, [doc], [chunk])
+            # MIN_EVIDENCE default is now 2, so provide two corroborating FAQ
+            # chunks (both label_as_experience) to keep the test meaningful.
+            chunks = [
+                ChunkRecord(
+                    chunk_id="c1", document_id="d1", title="宿舍问答",
+                    text="问题：宿舍是几人间？ 回答：目前大概率四人寝两人住。",
+                    chunk_type="faq", sequence=0, authority_tier="peer_experience",
+                    assertion_policy="label_as_experience", source_url=doc.source_url, uncertainty=["大概率"],
+                ),
+                ChunkRecord(
+                    chunk_id="c2", document_id="d1", title="宿舍问答",
+                    text="问题：宿舍有独立卫浴吗？ 回答：有空调和独立卫浴，每层有公共洗衣房。",
+                    chunk_type="faq", sequence=1, authority_tier="peer_experience",
+                    assertion_policy="label_as_experience", source_url=doc.source_url,
+                ),
+            ]
+            rebuild(path, [doc], chunks)
             result = HybridRetriever(path).search("宿舍住几个人")
             self.assertEqual(result["results"][0]["chunk_id"], "c1")
             self.assertEqual(result["answerability"], "experience_only")

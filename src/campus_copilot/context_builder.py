@@ -35,6 +35,9 @@ def build_context_packet(
             "page_number": result["page_number"],
             "heading_path": result["heading_path"],
             "source_url": result["source_url"],
+            "file_path": result.get("file_path"),
+            "media_type": result.get("media_type"),
+            "image_thumb": result.get("image_thumb"),
             "published_at": result["published_at"],
             "effective_from": result["effective_from"],
             "uploaded_at": result["uploaded_at"],
@@ -53,3 +56,49 @@ def build_context_packet(
         "evidence": evidence,
         "model_contract_version": "campus-grounding-v2",
     }
+
+
+def build_citation_metadata(context_packet: Dict[str, object]) -> Dict[str, object]:
+    """Build the {S1: {title, file_path, type, image_thumb, url, page, authority, ...}}
+    map that the frontend renders as source cards."""
+    metadata: Dict[str, object] = {}
+    for item in context_packet.get("evidence", []):
+        evidence_id = str(item.get("evidence_id"))
+        metadata[evidence_id] = {
+            "evidence_id": evidence_id,
+            "title": item.get("title"),
+            "file_path": item.get("file_path"),
+            "type": item.get("media_type"),
+            "image_thumb": item.get("image_thumb"),
+            "url": item.get("source_url") if item.get("media_type") == "link" else None,
+            "page": item.get("page_number"),
+            "authority": item.get("authority_tier"),
+            "assertion_policy": item.get("assertion_policy"),
+            "chunk_type": item.get("chunk_type"),
+            "excerpt": (str(item.get("text") or "")[:300]),
+        }
+    return metadata
+
+
+def build_visual_evidence(retrieval: Dict[str, object]) -> List[Dict[str, object]]:
+    """Build frontend-ready image/QR source cards from visual evidence.
+
+    These are supplementary "related image" cards: they never make a query
+    answerable (answerability is decided by textual evidence only) but the
+    frontend renders them under "相关图片佐证" so users can look at the image.
+    """
+    cards: List[Dict[str, object]] = []
+    for index, item in enumerate(retrieval.get("visual_evidence", []), start=1):
+        cards.append({
+            "evidence_id": f"V{index}",
+            "title": item.get("title"),
+            "file_path": item.get("file_path"),
+            "type": item.get("media_type"),
+            "image_thumb": item.get("image_thumb"),
+            "url": item.get("source_url") if item.get("media_type") == "link" else None,
+            "authority": item.get("authority_tier"),
+            "assertion_policy": item.get("assertion_policy"),
+            "chunk_type": item.get("chunk_type"),
+            "excerpt": (str(item.get("text") or "")[:200]),
+        })
+    return cards
