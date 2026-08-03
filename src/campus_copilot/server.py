@@ -1,5 +1,6 @@
 import json
 import mimetypes
+import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Dict
 from urllib.parse import quote, urlparse
@@ -18,24 +19,47 @@ from .preview_security import PreviewGuard, SlidingWindowLimiter, login_page, pa
 WEB_ROOT = PROJECT_ROOT / "web"
 
 
+def _bounded_env_int(name: str, default: int, minimum: int, maximum: int) -> int:
+    try:
+        value = int(os.getenv(name, str(default)))
+    except ValueError:
+        value = default
+    return max(minimum, min(value, maximum))
+
+
+def response_security_headers(path: str, forwarded_proto: str = "") -> Dict[str, str]:
+    headers = {
+        "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; form-action 'self'; base-uri 'none'",
+        "Cross-Origin-Opener-Policy": "same-origin",
+        "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+        "Referrer-Policy": "strict-origin-when-cross-origin",
+        "X-Content-Type-Options": "nosniff",
+        "X-Frame-Options": "DENY",
+    }
+    if path.startswith("/api/"):
+        headers["Cache-Control"] = "no-store"
+    if forwarded_proto.lower() == "https":
+        headers["Strict-Transport-Security"] = "max-age=31536000"
+    return headers
+
+
 class AppHandler(BaseHTTPRequestHandler):
     retriever = HybridRetriever(DB_PATH)
     chat = GroundedChatService(retriever, web_retriever=configured_web_retriever())
     preview = PreviewGuard()
     handoffs = SQLiteHandoffStore()
     handoff_limiter = SlidingWindowLimiter()
+    chat_limiter = SlidingWindowLimiter()
+    public_chat_limit = _bounded_env_int(
+        "CAMPUS_PUBLIC_CHAT_LIMIT_PER_HOUR", 60, 1, 1000
+    )
 
     def end_headers(self) -> None:
-        if self.preview.enabled:
-            self.send_header("Cache-Control", "no-store")
-            self.send_header("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; form-action 'self'; base-uri 'none'")
-            self.send_header("Cross-Origin-Opener-Policy", "same-origin")
-            self.send_header("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
-            self.send_header("Referrer-Policy", "no-referrer")
-            self.send_header("X-Content-Type-Options", "nosniff")
-            self.send_header("X-Frame-Options", "DENY")
-            if self.headers.get("X-Forwarded-Proto", "").lower() == "https":
-                self.send_header("Strict-Transport-Security", "max-age=86400")
+        path = urlparse(self.path).path
+        for name, value in response_security_headers(
+            path, self.headers.get("X-Forwarded-Proto", "")
+        ).items():
+            self.send_header(name, value)
         super().end_headers()
 
     def _client_ip(self) -> str:
@@ -147,6 +171,13 @@ class AppHandler(BaseHTTPRequestHandler):
                 self.end_headers()
                 return
             if not self._protected(path, is_chat=path in {"/api/chat", "/api/handoff"}):
+                return
+            if path == "/api/chat" and not self.chat_limiter.allow(
+                "chat:" + self._client_ip(),
+                limit=self.public_chat_limit,
+                window_seconds=3600,
+            ):
+                self._json({"error": "rate_limited"}, 429)
                 return
             if self.headers.get("Origin") and not self.preview.same_origin(self.headers):
                 self._json({"error": "origin_rejected"}, 403)
