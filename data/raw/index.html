@@ -1,0 +1,1995 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=5.0,user-scalable=yes">
+<title>中传海南2026一站通</title>
+<style>
+  :root {
+    --bg: #f0f2f5;
+    --card: #fff;
+    --text: #1f2937;
+    --text-secondary: #6b7280;
+    --text-muted: #9ca3af;
+    --accent: #2563eb;
+    --accent-hover: #1d4ed8;
+    --tag-blue-bg: #eff6ff;
+    --tag-blue-text: #2563eb;
+    --tag-red-bg: #fef2f2;
+    --tag-red-text: #dc2626;
+    --pin-gold: #f59e0b;
+    --pin-bg: #fffbeb;
+    --pin-border: #fcd34d;
+    --border: #e5e7eb;
+    --shadow: 0 1px 3px rgba(0,0,0,.08);
+    --shadow-hover: 0 2px 8px rgba(0,0,0,.1);
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111827;
+      --card: #1f2937;
+      --text: #f3f4f6;
+      --text-secondary: #9ca3af;
+      --text-muted: #6b7280;
+      --tag-blue-bg: #1e3a5f;
+      --tag-blue-text: #93c5fd;
+      --tag-red-bg: #3b1515;
+      --tag-red-text: #fca5a5;
+      --pin-bg: #2d2410;
+      --pin-border: #92400e;
+      --border: #374151;
+      --shadow: 0 1px 3px rgba(0,0,0,.3);
+      --shadow-hover: 0 2px 8px rgba(0,0,0,.5);
+    }
+  }
+  *,*::before,*::after { box-sizing:border-box;margin:0;padding:0 }
+  body {
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;
+    background:var(--bg); color:var(--text); line-height:1.5;
+    min-height:100dvh; padding-bottom:40px;
+  }
+  .container { max-width:760px; margin:0 auto; padding:0 12px }
+
+  /* Header */
+  header {
+    background:var(--card); border-bottom:1px solid var(--border);
+    padding:16px 0; position:sticky; top:0; z-index:100;
+    box-shadow:var(--shadow);
+  }
+  header .container { display:flex; flex-direction:column; gap:10px }
+  .title-row { display:flex; align-items:center; gap:10px }
+  .logo {
+    width:36px; height:36px; border-radius:9px;
+    background:linear-gradient(135deg,#2563eb,#7c3aed);
+    display:flex; align-items:center; justify-content:center;
+    color:#fff; font-size:18px; font-weight:700; flex-shrink:0;
+  }
+  .title { font-size:18px; font-weight:700; letter-spacing:-.5px }
+  .subtitle { font-size:12px; color:var(--text-secondary) }
+  .search-wrap { position:relative; width:100% }
+  .search-wrap svg {
+    position:absolute; left:10px; top:50%; transform:translateY(-50%);
+    width:16px; height:16px; color:var(--text-secondary); pointer-events:none;
+  }
+  #search {
+    width:100%; padding:9px 10px 9px 34px; border:1.5px solid var(--border);
+    border-radius:var(--radius-sm); font-size:14px; background:var(--bg); color:var(--text);
+    outline:none; transition:border-color .2s,box-shadow .2s; -webkit-appearance:none;
+  }
+  #search:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(37,99,235,.15) }
+  #search::placeholder { color:var(--text-muted) }
+
+  /* Stats */
+  .stats-bar { display:flex; align-items:center; justify-content:space-between; padding:14px 0 8px; font-size:12px; color:var(--text-secondary) }
+  .st-panel { max-height:60vh; overflow-y:auto }
+  .st-cards { display:flex; gap:12px; margin-bottom:16px }
+  .st-card { flex:1; background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:12px; text-align:center }
+  .st-card .v { font-size:22px; font-weight:700; color:var(--accent) }
+  .st-card .l { font-size:11px; color:var(--text-muted); margin-top:2px }
+  .st-table { width:100%; border-collapse:collapse; font-size:12px }
+  .st-table th { text-align:left; padding:6px 8px; border-bottom:2px solid var(--border); color:var(--text-muted); font-weight:600; position:sticky; top:0; background:var(--bg) }
+  .st-table td { padding:6px 8px; border-bottom:1px solid var(--border); vertical-align:middle }
+  .st-date { white-space:nowrap; font-weight:500 }
+  .st-bar-cell { min-width:120px }
+  .st-bar-wrap { display:flex; height:20px; border-radius:3px; overflow:hidden; background:rgba(0,0,0,.05); position:relative }
+  .st-bar-wrap:hover { opacity:.85 }
+  .st-bar-seg { height:100%; min-width:2px; cursor:pointer; position:relative }
+  .st-bar-seg:hover { filter:brightness(1.15) }
+  .st-bar-total { font-size:10px; color:var(--text-muted); margin-left:6px; white-space:nowrap }
+  .st-bar-tip { display:none; position:fixed; background:#1a1a2e; color:#fff; padding:6px 10px; border-radius:6px; font-size:11px; z-index:10001; pointer-events:none; white-space:nowrap; box-shadow:0 2px 8px rgba(0,0,0,.3) }
+  .result-count { font-weight:600; color:var(--text) }
+  .clear-filter {
+    color:var(--accent); cursor:pointer; border:none; background:none;
+    font-size:12px; padding:3px 8px; border-radius:4px; transition:background .15s;
+  }
+  .clear-filter:hover { background:var(--tag-blue-bg) }
+
+  /* Tags */
+  .tags-section { padding:0 0 12px }
+  .tags-label { font-size:11px; color:var(--text-secondary); margin-bottom:6px; font-weight:600; text-transform:uppercase; letter-spacing:.5px }
+  .tags-list { display:flex; flex-wrap:wrap; gap:5px }
+  .tag {
+    display:inline-flex; align-items:center; gap:3px;
+    padding:4px 10px; border-radius:16px; font-size:12px; font-weight:500;
+    cursor:pointer; border:none; transition:all .15s;
+    user-select:none; -webkit-tap-highlight-color:transparent;
+    background:var(--tag-blue-bg); color:var(--tag-blue-text);
+  }
+  .tag:hover { opacity:.85 }
+  .tag.active { background:var(--accent); color:#fff }
+  .tag .count { font-size:10px; opacity:.7 }
+
+  /* File list */
+  .file-list { display:flex; flex-direction:column; gap:8px }
+
+  .file-row {
+    background:var(--card); border:1px solid var(--border); border-radius:var(--radius);
+    padding:14px; box-shadow:var(--shadow); transition:box-shadow .15s;
+    display:flex; align-items:center; gap:12px;
+    cursor:pointer; -webkit-tap-highlight-color:transparent;
+  }
+  .file-row:hover { box-shadow:var(--shadow-hover) }
+
+  /* Pinned */
+  .file-row.pinned {
+    background:var(--pin-bg); border-color:var(--pin-border); border-width:1.5px;
+  }
+  .pin-badge {
+    display:inline-flex; align-items:center; gap:2px;
+    font-size:10px; font-weight:600; color:var(--pin-gold);
+    background:#fef3c7; padding:1px 6px; border-radius:8px;
+    margin-left:6px; white-space:nowrap;
+  }
+  @media (prefers-color-scheme: dark) { .pin-badge { background:#3d2e0a } }
+
+  /* Icon */
+  .file-icon {
+    width:40px; height:40px; border-radius:8px; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center; font-size:20px;
+  }
+  .file-icon.pdf   { background:#fef2f2; color:#dc2626 }
+  .file-icon.excel { background:#f0fdf4; color:#16a34a }
+  .file-icon.word  { background:#eff6ff; color:#2563eb }
+  .file-icon.image { background:#fefce8; color:#ca8a04 }
+  .file-icon.link-icon { background:#f0fdf4; color:#059669 }
+
+  /* Info */
+  .file-info { flex:1; min-width:0 }
+  .file-title {
+    font-size:15px; font-weight:600; line-height:1.4; word-break:break-word;
+  }
+  .file-desc {
+    font-size:13px; color:var(--text-secondary); margin-top:3px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .file-meta {
+    display:flex; align-items:center; gap:6px; margin-top:6px;
+    font-size:11px; color:var(--text-muted); flex-wrap:wrap;
+  }
+  .file-meta .dot { width:3px; height:3px; border-radius:50%; background:var(--text-muted); flex-shrink:0 }
+  .view-count { color:var(--accent); font-weight:500; white-space:nowrap }
+  .file-tags { display:flex; flex-wrap:wrap; gap:4px; margin-top:6px }
+
+  .file-tag {
+    font-size:10px; padding:2px 7px; border-radius:8px; white-space:nowrap; font-weight:500;
+  }
+  .file-tag.blue { background:var(--tag-blue-bg); color:var(--tag-blue-text) }
+  .file-tag.red  { background:var(--tag-red-bg); color:var(--tag-red-text) }
+
+  .relevance-badge {
+    font-size:10px; padding:1px 5px; border-radius:6px;
+    background:#dbeafe; color:#1d4ed8; margin-left:4px; font-weight:600; white-space:nowrap;
+  }
+
+  /* Actions */
+  .file-actions { display:flex; gap:6px; flex-shrink:0 }
+  .btn-icon {
+    width:34px; height:34px; border-radius:50%; border:1px solid var(--border);
+    background:var(--card); color:var(--text); display:flex;
+    align-items:center; justify-content:center; cursor:pointer;
+    transition:all .15s; font-size:15px; flex-shrink:0;
+  }
+  .btn-icon:hover { background:var(--accent); color:#fff; border-color:var(--accent) }
+  .btn-icon.download:hover { background:#16a34a; border-color:#16a34a }
+
+  /* Empty */
+  .empty {
+    text-align:center; padding:60px 20px; color:var(--text-secondary);
+  }
+  .empty svg { width:56px; height:56px; margin-bottom:12px; opacity:.4 }
+  .empty p { font-size:14px }
+
+  /* Modal */
+  .modal-overlay {
+    display:none; position:fixed; inset:0; background:rgba(0,0,0,.7);
+    z-index:200; align-items:center; justify-content:center; padding:0;
+  }
+  .modal-overlay.show { display:flex }
+  .modal {
+    background:var(--card); border-radius:var(--radius);
+    width:100%; max-width:90vw; max-height:90dvh; display:flex; flex-direction:column;
+    overflow:hidden; box-shadow:0 20px 60px rgba(0,0,0,.3);
+    transition:max-width .2s,max-height .2s,border-radius .2s;
+  }
+  .modal.fullscreen { max-width:100vw; max-height:100dvh; border-radius:0 }
+  .modal-header {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:12px 14px; border-bottom:1px solid var(--border);
+  }
+  .modal-title { font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1; margin-right:10px }
+  .modal-close {
+    width:30px; height:30px; border-radius:50%; border:none;
+    background:var(--bg); color:var(--text); cursor:pointer;
+    display:flex; align-items:center; justify-content:center; font-size:16px;
+    transition:background .15s; flex-shrink:0;
+  }
+  .modal-close:hover { background:#ef4444; color:#fff }
+  .modal-body { flex:1; overflow:auto; display:flex; align-items:center; justify-content:center; padding:0; min-height:150px }
+  .modal-body iframe { width:100%; height:100%; border:none; border-radius:0; min-height:60dvh }
+  .modal-body img { max-width:100%; max-height:75dvh; object-fit:contain; border-radius:0 }
+  .modal-body .unsupported { text-align:center; color:var(--text-secondary); padding:40px 20px }
+  .modal-body .unsupported p { margin-bottom:14px }
+  .modal-body .unsupported a {
+    display:inline-block; padding:9px 20px; background:var(--accent); color:#fff;
+    border-radius:var(--radius-sm); text-decoration:none; font-weight:500;
+    transition:background .15s;
+  }
+  .modal-body .unsupported a:hover { background:var(--accent-hover) }
+
+  @media (max-width:480px) {
+    .title { font-size:16px }
+    .file-row { padding:12px; gap:10px }
+    .file-icon { width:34px; height:34px; font-size:17px }
+    .file-title { font-size:14px }
+    .file-desc { font-size:12px }
+    .btn-icon { width:30px; height:30px; font-size:13px }
+  }
+
+  /* PDF.js viewer */
+  .pdf-canvas-wrap { position:relative; width:100%; height:100%; overflow:auto; display:flex; align-items:flex-start; justify-content:center; background:#525659; padding:8px 0 50px }
+  .pdf-canvas-wrap canvas { max-width:100%; height:auto!important; box-shadow:0 2px 12px rgba(0,0,0,.4) }
+  .pdf-controls {
+    position:fixed; bottom:0; left:0; right:0; z-index:210;
+    background:var(--card); border-top:1px solid var(--border);
+    display:flex; align-items:center; justify-content:center; gap:8px;
+    padding:10px 16px; padding-bottom:max(10px,env(safe-area-inset-bottom));
+  }
+  .pdf-ctrl-btn {
+    width:36px; height:36px; border-radius:50%; border:1px solid var(--border);
+    background:var(--card); color:var(--text); font-size:16px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; transition:all .15s;
+  }
+  .pdf-ctrl-btn:active { background:var(--accent); color:#fff; border-color:var(--accent) }
+  .pdf-ctrl-btn:disabled { opacity:.3; pointer-events:none }
+  .pdf-page-num { font-size:13px; font-weight:600; color:var(--text); min-width:70px; text-align:center }
+  .pdf-loading { display:flex; align-items:center; justify-content:center; height:60dvh; color:var(--text-secondary); font-size:14px }
+
+  /* ─── Tab Navigation ─── */
+  .tab-nav { display:flex; gap:4px; padding:6px; background:var(--card); border-radius:12px; box-shadow:var(--shadow); max-width:fit-content; margin:12px auto 4px }
+  .tab-nav button { padding:8px 20px; border:none; border-radius:9px; background:transparent; color:var(--text-secondary); font-size:14px; font-weight:500; cursor:pointer; transition:all .2s; font-family:inherit }
+  .tab-nav button:hover { color:var(--text) }
+  .tab-nav button.active { background:var(--accent); color:#fff }
+  /* Q&A */
+  .qa-detail { background:var(--card); border-radius:var(--radius); padding:14px 16px; box-shadow:var(--shadow); box-sizing:border-box; width:100%; overflow:hidden }
+  .qa-detail h1, .qa-detail h2 { margin:20px 0 10px; font-weight:700; line-height:1.3 }
+  .qa-detail h1:first-child, .qa-detail h2:first-child { margin-top:0 }
+  .qa-detail h1 { font-size:20px }
+  .qa-detail h2 { font-size:17px; border-bottom:1px solid var(--border); padding-bottom:6px }
+  .qa-detail h3 { font-size:15px; margin:14px 0 6px }
+  .qa-detail p { margin:8px 0; line-height:1.7; font-size:14px }
+  .qa-detail ul, .qa-detail ol { padding-left:20px; margin:8px 0; line-height:1.7; font-size:14px }
+  .qa-detail li { margin:4px 0 }
+  .qa-detail a { color:var(--accent); text-decoration:underline }
+  .qa-detail code { background:rgba(0,0,0,.06); padding:2px 6px; border-radius:4px; font-size:13px; font-family:SFMono-Regular,Consolas,monospace }
+  .qa-detail pre { background:rgba(0,0,0,.04); padding:14px; border-radius:8px; overflow-x:auto; line-height:1.5; font-size:13px; margin:12px 0 }
+  .qa-detail pre code { background:none; padding:0 }
+  .qa-detail blockquote { border-left:3px solid var(--accent); margin:12px 0; padding:8px 16px; background:rgba(37,99,235,.04); border-radius:0 6px 6px 0; color:var(--text-secondary) }
+  .qa-detail strong { font-weight:600 }
+  .qa-detail em { font-style:italic }
+  .qa-empty { text-align:center; padding:40px; color:var(--text-muted); font-size:14px }
+
+  /* China Map */
+  /* China Map */
+  .china-map-wrap { max-width:600px; margin:0 auto }
+  .china-map svg path { stroke:#fff; stroke-width:.5; vector-effect:non-scaling-stroke; transition:fill .2s }
+  .china-map svg .mp-inactive { fill:#e8e8e8; cursor:default }
+  .china-map svg .mp-active { fill:#6366f1; cursor:pointer; opacity:.7 }
+  .china-map svg .mp-active:hover { opacity:1 }
+  @media(prefers-color-scheme:dark) {
+    .china-map svg .mp-inactive { fill:#2a2a3e }
+  }
+
+  .hm-tags { display:flex; flex-wrap:wrap; gap:8px; margin-top:16px; justify-content:center }
+  .hm-tag { padding:8px 16px; border-radius:20px; background:var(--accent); color:#fff; font-size:13px; font-weight:500; cursor:pointer; transition:all .15s; border:none; font-family:inherit }
+  .hm-tag:hover { opacity:.85; transform:scale(1.05) }
+  .hm-tag:active { transform:scale(.97) }
+  .cm-cell,.hm-overlay { /* legacy, kept for compatibility */ }
+  .cm-cell { aspect-ratio:1.6; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:600; cursor:default; transition:all .15s; background:var(--bg); border:1px solid var(--border); color:var(--text2); user-select:none }
+  .cm-cell.active { background:var(--accent); color:#fff; border-color:var(--accent); cursor:pointer }
+  .cm-cell.active:hover { opacity:.85; transform:scale(1.05); box-shadow:0 2px 8px rgba(99,102,241,.3) }
+  .cm-cell.empty { visibility:hidden }
+  .hm-overlay { display:none; position:fixed; inset:0; z-index:20000; background:rgba(0,0,0,.55); align-items:center; justify-content:center }
+  .hm-overlay.show { display:flex }
+  .hm-card { background:var(--card); border-radius:var(--radius); padding:24px; max-width:320px; width:90%; text-align:center; position:relative; box-shadow:0 8px 32px rgba(0,0,0,.2) }
+  .hm-close { position:absolute; top:10px; right:12px; background:none; border:none; font-size:18px; cursor:pointer; color:var(--text2); font-family:inherit }
+  .hm-title { font-size:15px; font-weight:700; margin-bottom:16px }
+  .hm-img { max-width:100%; border-radius:6px }
+
+  #mapThumb { display:none; position:fixed; z-index:9999; background:var(--card); border:1px solid var(--border); border-radius:8px; padding:8px; box-shadow:0 4px 16px rgba(0,0,0,.15); pointer-events:none; transform:translate(0,-105%) }
+
+
+  /* ─── QR Tab Section ─── */
+  #tab-files, #tab-qr, #tab-qa { display:none }
+  #tab-files.active, #tab-qr.active, #tab-qa.active { display:block }
+
+  .qr-tab-bar { display:none; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; padding:8px 0 16px; margin-top:4px }
+  .qr-tab-bar::-webkit-scrollbar { display:none }
+  .qr-tab-inner { display:flex; gap:8px; min-width:max-content }
+  .qr-tab-btn { flex-shrink:0; padding:7px 18px; border-radius:20px; border:1px solid var(--border); background:transparent; color:var(--text-secondary); font-size:13px; cursor:pointer; transition:all .2s; white-space:nowrap; font-family:inherit }
+  .qr-tab-btn:hover { color:var(--text); border-color:var(--text-muted) }
+  .qr-tab-btn.active { background:var(--accent); color:#fff; border-color:var(--accent) }
+
+  .qr-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px }
+  .qr-card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; cursor:pointer; transition:all .2s; display:flex; flex-direction:column; box-shadow:0 1px 3px rgba(0,0,0,.04) }
+  .qr-card:hover { border-color:var(--accent); box-shadow:var(--shadow) }
+  .qr-img-wrap { position:relative; background:#f8f9fb; display:flex; align-items:center; justify-content:center; padding:28px; aspect-ratio:1; overflow:hidden }
+  .qr-img-wrap img { max-width:100%; max-height:100%; object-fit:contain; transition:transform .3s }
+  .qr-card:hover .qr-img-wrap img { transform:scale(1.04) }
+  .qr-body { padding:14px 16px 16px; flex:1; display:flex; flex-direction:column; gap:6px }
+  .qr-title { font-size:15px; font-weight:600 }
+  .qr-desc { font-size:13px; color:var(--text-secondary); line-height:1.4 }
+  .qr-footer { display:flex; align-items:center; gap:8px; margin-top:auto; padding-top:8px }
+  .qr-cat { font-size:11px; padding:3px 10px; border-radius:10px; background:var(--tag-blue-bg); color:var(--tag-blue-text); font-weight:500 }
+  .qr-pin { font-size:11px; color:var(--accent) }
+
+  @media (max-width:640px) {
+    .qr-grid { grid-template-columns:1fr; gap:12px }
+    .qr-tab-bar { display:block }
+    .qr-img-wrap { padding:24px }
+    .tab-nav button { padding:8px 16px; font-size:13px }
+  }
+
+  /* ─── Admin Panel ─── */
+  @keyframes adminIn { from{opacity:0;transform:translateY(20px) scale(.96)} to{opacity:1;transform:translateY(0) scale(1)} }
+  #adminOverlay { display:none; position:fixed; inset:0; z-index:10000; background:rgba(0,0,0,.55); backdrop-filter:blur(4px); align-items:center; justify-content:center }
+  #adminOverlay.show { display:flex }
+  #adminOverlay.show .admin-card { animation:adminIn .3s ease }
+  .admin-card { background:var(--card); border-radius:16px; width:min(520px,92vw); max-height:90dvh; overflow-y:auto; padding:28px 24px; box-shadow:0 20px 60px rgba(0,0,0,.25); position:relative }
+  .admin-card h3 { font-size:18px; margin:0 0 6px; display:flex; align-items:center; gap:8px }
+  .admin-hint { font-size:12px; color:var(--text-muted); margin-bottom:18px }
+  .admin-close { position:absolute; top:16px; right:20px; background:none; border:none; font-size:22px; cursor:pointer; color:var(--text-muted); line-height:1 }
+  .admin-close:hover { color:var(--text) }
+  .admin-dropzone { border:2px dashed var(--border); border-radius:12px; padding:36px 20px; text-align:center; cursor:pointer; transition:all .2s; margin-bottom:18px }
+  .admin-dropzone:hover,.admin-dropzone.dragover { border-color:var(--accent); background:rgba(0,122,255,.04) }
+  .admin-dropzone svg { display:block; margin:0 auto 8px; color:var(--text-muted) }
+  .admin-dropzone p { margin:4px 0; font-size:14px; color:var(--text-secondary) }
+  .admin-dropzone .dz-sub { font-size:12px; color:var(--text-muted) }
+  .admin-file-selected { display:none; background:var(--tag-blue-bg); border-radius:8px; padding:12px 16px; margin-bottom:18px; align-items:center; gap:10px }
+  .admin-file-selected .fn { font-weight:600; font-size:14px; flex:1; word-break:break-all }
+  .admin-file-selected .fsz { font-size:12px; color:var(--text-muted); white-space:nowrap }
+  .admin-meta { display:none; flex-direction:column; gap:12px; margin-bottom:20px }
+  .admin-meta label { display:flex; flex-direction:column; gap:4px; font-size:13px; font-weight:500; color:var(--text-secondary) }
+  .admin-meta input,.admin-meta textarea { padding:9px 12px; border:1px solid var(--border); border-radius:8px; font-size:14px; font-family:inherit; background:var(--bg); color:var(--text); resize:vertical }
+  .admin-meta textarea { min-height:50px }
+  .admin-meta input:focus,.admin-meta textarea:focus { outline:none; border-color:var(--accent); box-shadow:0 0 0 3px rgba(0,122,255,.12) }
+  .admin-tag-chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:4px }
+  .admin-tag-chip { display:inline-flex; align-items:center; gap:4px; padding:4px 10px; border-radius:14px; font-size:12px; background:var(--tag-blue-bg); color:var(--tag-blue-text); cursor:pointer; user-select:none }
+  .admin-tag-chip .rm { font-weight:bold; opacity:.5 }
+  .admin-tag-chip:hover .rm { opacity:1 }
+  .admin-tag-input { margin-top:4px; padding:6px 10px; border:1px dashed var(--border); border-radius:14px; font-size:12px; width:100px; background:transparent; font-family:inherit; color:var(--text) }
+  .admin-tag-input:focus { outline:none; border-color:var(--accent) }
+  .admin-source { font-size:11px; color:var(--text-muted); margin-top:2px }
+  .admin-actions { display:flex; gap:10px; justify-content:flex-end }
+  .btn-primary { padding:10px 28px; border:none; border-radius:9px; background:var(--accent); color:#fff; font-size:14px; font-weight:600; cursor:pointer; transition:all .2s; font-family:inherit }
+  .btn-primary:hover { opacity:.9; transform:translateY(-1px) }
+  .btn-primary:disabled { opacity:.5; cursor:not-allowed; transform:none }
+  .btn-secondary { padding:10px 20px; border:1px solid var(--border); border-radius:9px; background:transparent; color:var(--text-secondary); font-size:14px; cursor:pointer; transition:all .2s; font-family:inherit }
+  .btn-secondary:hover { border-color:var(--text-muted); color:var(--text) }
+  .admin-toast { display:none; position:fixed; top:20px; left:50%; transform:translateX(-50%); z-index:20000; padding:10px 24px; border-radius:10px; font-size:14px; font-weight:500; box-shadow:0 4px 20px rgba(0,0,0,.15); animation:adminIn .3s ease }
+  .admin-toast.success { background:#34c759; color:#fff }
+  .admin-toast.error { background:#ff3b30; color:#fff }
+  #adPassword:focus { outline:none; border-color:var(--accent); box-shadow:0 0 0 3px rgba(0,122,255,.12) }
+  #adAuthError:empty { display:none }
+
+  /* Multi-file upload */
+  .af-list { display:flex; flex-direction:column; gap:12px; margin-bottom:18px; max-height:50vh; overflow-y:auto }
+  .af-item { background:var(--bg); border:1px solid var(--border); border-radius:10px; overflow:hidden }
+  .af-item-header { display:flex; align-items:center; gap:10px; padding:12px 16px; cursor:pointer; user-select:none }
+  .af-item-header:hover { background:rgba(0,0,0,.02) }
+  .af-icon { font-size:18px; flex-shrink:0 }
+  .af-name { font-weight:600; font-size:13px; flex:1; word-break:break-all }
+  .af-size { font-size:11px; color:var(--text-muted); flex-shrink:0 }
+  .af-status { font-size:12px; padding:2px 8px; border-radius:10px; flex-shrink:0 }
+  .af-status.up { background:#fff3cd; color:#856404 }
+  .af-status.ok { background:#d4edda; color:#155724 }
+  .af-status.err { background:#f8d7da; color:#721c24 }
+  .af-progress { width:60px; height:3px; background:var(--border); border-radius:2px; overflow:hidden; flex-shrink:0 }
+  .af-progress-bar { height:100%; background:var(--accent); transition:width .2s }
+
+  /* Existing file list (delete) */
+  .ef-section { margin-top:18px; padding-top:14px; border-top:1px solid var(--border) }
+  .ef-title { font-size:13px; font-weight:600; color:var(--text-secondary); margin-bottom:8px }
+  .ef-list { display:flex; flex-direction:column; gap:4px; max-height:30vh; overflow-y:auto }
+  .ef-item { display:flex; align-items:center; gap:10px; padding:8px 12px; border-radius:8px; font-size:12px; background:var(--bg); transition:background .15s }
+  .ef-item:hover { background:rgba(0,0,0,.03) }
+  .ef-name { font-weight:500; flex:1; word-break:break-all; color:var(--text) }
+  .ef-tags { display:none }
+  .ef-tag { padding:1px 7px; border-radius:8px; font-size:10px; background:var(--tag-blue-bg); color:var(--tag-blue-text); white-space:nowrap }
+  .ef-size { color:var(--text-muted); font-size:11px; flex-shrink:0 }
+  .ef-del { padding:3px 10px; border:1px solid #ff3b30; border-radius:6px; background:transparent; color:#ff3b30; font-size:11px; cursor:pointer; flex-shrink:0; font-family:inherit; transition:.15s }
+  .ef-del:hover { background:#ff3b30; color:#fff }
+  .ef-del:disabled { opacity:.4; cursor:not-allowed }
+  .ef-preview { padding:2px 8px; border:1px solid var(--border); border-radius:6px; background:transparent; font-size:13px; cursor:pointer; flex-shrink:0; font-family:inherit; transition:.15s; line-height:1.4 }
+  .ef-preview:hover { background:var(--bg); border-color:var(--accent) }
+  .ef-pin { padding:3px 10px; border:1px solid #f59e0b; border-radius:6px; background:transparent; color:#f59e0b; font-size:11px; cursor:pointer; flex-shrink:0; font-family:inherit; transition:.15s; white-space:nowrap }
+  .ef-pin:hover { background:#f59e0b; color:#fff }
+  .ef-pin:disabled { opacity:.4; cursor:not-allowed }
+  .ef-pin-badge { font-size:11px; flex-shrink:0 }
+
+  /* Link management */
+  .el-form { display:flex; flex-direction:column; gap:6px; margin-top:8px }
+  .el-form input { padding:7px 10px; border:1px solid var(--border); border-radius:6px; font-size:12px; font-family:inherit; background:var(--bg); color:var(--text); outline:none }
+  .el-form input:focus { border-color:var(--accent) }
+  .el-item { display:flex; align-items:center; gap:10px; padding:8px 12px; border-radius:8px; font-size:12px; background:var(--bg) }
+  .el-item:hover { background:rgba(0,0,0,.03) }
+  .el-name { font-weight:500; flex:1; word-break:break-all; color:var(--text) }
+  .el-url { color:var(--text-muted); font-size:11px; flex:1; word-break:break-all }
+  .el-pin { padding:3px 10px; border:1px solid #f59e0b; border-radius:6px; background:transparent; color:#f59e0b; font-size:11px; cursor:pointer; flex-shrink:0; font-family:inherit; transition:.15s; white-space:nowrap }
+  .el-pin:hover { background:#f59e0b; color:#fff }
+  .el-pin:disabled { opacity:.4; cursor:not-allowed }
+  .el-del { padding:3px 10px; border:1px solid #ff3b30; border-radius:6px; background:transparent; color:#ff3b30; font-size:11px; cursor:pointer; flex-shrink:0; font-family:inherit; transition:.15s }
+  .el-del:hover { background:#ff3b30; color:#fff }
+  .el-del:disabled { opacity:.4; cursor:not-allowed }
+  .el-pin-badge { font-size:11px; flex-shrink:0 }
+
+
+
+  @media (max-width:640px) {
+    .ef-size { display:none }
+    .ef-item { gap:6px; padding:8px }
+    .ef-name { font-size:11px }
+    .ef-del, .ef-preview, .ef-pin { font-size:10px; padding:2px 8px }
+  }
+
+  .af-body { display:none; padding:0 16px 14px; flex-direction:column; gap:8px }
+  .af-item.expanded .af-body { display:flex }
+  .af-body label { display:flex; flex-direction:column; gap:3px; font-size:12px; font-weight:500; color:var(--text-secondary) }
+  .af-body input,.af-body textarea { padding:7px 10px; border:1px solid var(--border); border-radius:6px; font-size:13px; font-family:inherit; background:var(--card); color:var(--text); resize:vertical }
+  .af-body textarea { min-height:36px }
+  .af-body input:focus,.af-body textarea:focus { outline:none; border-color:var(--accent) }
+  .af-tag-chips { display:flex; flex-wrap:wrap; gap:4px; margin-top:2px }
+  .af-tag-chip { display:inline-flex; align-items:center; gap:3px; padding:2px 8px; border-radius:12px; font-size:11px; background:var(--tag-blue-bg); color:var(--tag-blue-text); cursor:pointer; user-select:none }
+  .af-tag-chip .rm { font-weight:bold; opacity:.4 }
+  .af-tag-chip:hover .rm { opacity:1 }
+  .af-tag-input { margin-top:2px; padding:4px 8px; border:1px dashed var(--border); border-radius:12px; font-size:11px; width:80px; background:transparent; font-family:inherit; color:var(--text) }
+  .af-tag-input:focus { outline:none; border-color:var(--accent) }
+  .af-bar { display:flex; gap:8px; align-items:center; padding:0 16px 12px }
+  .af-ai-btn { padding:5px 14px; border:1px solid var(--accent); border-radius:7px; background:transparent; color:var(--accent); font-size:12px; cursor:pointer; font-family:inherit; transition:.15s }
+  .af-ai-btn:hover { background:var(--tag-blue-bg) }
+  .af-ai-btn:disabled { opacity:.4; cursor:not-allowed }
+  .af-source { font-size:10px; color:var(--text-muted) }
+  .af-save-btn { padding:5px 14px; border:none; border-radius:7px; background:var(--accent); color:#fff; font-size:12px; cursor:pointer; font-family:inherit; margin-left:auto }
+  .af-save-btn:hover { opacity:.85 }
+  .af-save-btn:disabled { opacity:.5; cursor:not-allowed }
+
+  /* Footer */
+  .site-footer { text-align:center; padding:24px 16px 32px; font-size:11px; color:var(--text-muted); border-top:1px solid var(--border); margin-top:40px }
+  .site-footer span { opacity:.6 }
+
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <div class="title-row">
+      <div class="logo">🎓</div>
+      <div>
+        <div class="title">中国传媒大学海南国际学院2026级新生一站通</div>
+        <div class="subtitle">By 24智科字画娜娜 基于群文件整理 仅代表非官方角度</div>
+      </div>
+    </div>
+    <div class="search-wrap">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      <input type="search" id="search" placeholder="搜索文件名或标签…" autocomplete="off">
+    </div>
+  </div>
+</header>
+
+<div class="container" style="margin-bottom:16px">
+  <nav class="tab-nav" id="tabNav">
+    <button class="active" data-tab="files">📁 文件库</button>
+    <button data-tab="qa">💬 师哥师姐Q&A</button>
+    <button data-tab="qr">📱 群二维码</button>
+  </nav>
+</div>
+
+<div id="tab-files" class="active">
+<main class="container">
+  <div class="stats-bar">
+    <span class="result-count" id="resultCount"></span>
+    <div>
+      <button class="clear-filter" id="clearFilter" style="display:none">✕ 清除筛选</button>
+    </div>
+  </div>
+
+  <section class="tags-section">
+    <div class="tags-label">按标签筛选</div>
+    <div class="tags-list" id="tagFilters"></div>
+  </section>
+
+  <div class="file-list" id="fileList"></div>
+  <div class="empty" id="emptyState" style="display:none">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+    <p>没有匹配的文件，试试其他关键词</p>
+  </div>
+</main>
+</div><!-- /#tab-files -->
+
+<div id="tab-qr">
+<main class="container">
+  <!-- Category tabs -->
+  <nav class="qr-tab-bar" id="qrTabBar"><div class="qr-tab-inner" id="qrTabInner"></div></nav>
+  <!-- QR grid: 4 per row -->
+  <div class="qr-grid" id="qrGrid"></div>
+  <div class="empty" id="qrEmpty" style="display:none">
+    <span style="font-size:40px;display:block;margin-bottom:12px">📭</span>
+    <p>暂无二维码</p>
+  </div>
+
+  <!-- Hometown Map -->
+  <h3 style="margin:32px 0 12px;font-size:16px">🏠 老乡群</h3>
+  <div class="china-map-wrap">
+    <div class="china-map" id="chinaMap"></div>
+    <div class="hm-tags" id="hmTags"></div>
+  </div>
+  <!-- Hometown popup -->
+  <div class="hm-overlay" id="hmOverlay">
+    <div class="hm-card" id="hmCard">
+      <button class="hm-close" id="hmClose">✕</button>
+      <div class="hm-title" id="hmTitle"></div>
+      <img class="hm-img" id="hmImg" src="" alt="">
+    </div>
+  </div>
+</main>
+</div><!-- /#tab-qr -->
+<div id="tab-qa">
+<main class="container">
+  <div id="qaContent"></div>
+</main>
+</div><!-- /#tab-qa -->
+
+
+<!-- Preview Modal -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="modalTitle"></span>
+      <button class="modal-close" id="modalClose">✕</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<script>
+// ─── Data ──────────────────────────────────────────────────────────
+let data = { tagColors: {}, files: [] };
+let viewsData = {};
+let qrData = { items: [], hometown: {} };
+let allTags = [];
+let activeTag = null;
+let searchQuery = '';
+
+async function init() {
+  try {
+    data = await loadJSON('files.json?t=' + Date.now());
+  } catch(e) {
+    data = { tagColors: {}, files: [] };
+    document.getElementById('fileList').innerHTML =
+      `<div class="empty"><p>⚠️ 加载失败</p><p style="font-size:12px;margin-top:6px">${e.message}</p></div>`;
+    return;
+  }
+  // QR data — non-blocking
+  try { qrData = await loadJSON('qrcodes.json?t=' + Date.now()); console.log('QR loaded:', (qrData.items||[]).length, 'items, hometown:', Object.keys(qrData.hometown||{}).length, 'provinces', Object.keys(qrData.hometown||{})); } catch(e) { qrData = { items: [], hometown: {} }; console.warn('QR load failed:', e); }
+
+  buildTagIndex();
+  render();
+  fetchViews();  // async, will re-render when done
+  try { renderQR(); console.log('renderQR done'); } catch(e) { console.error('renderQR error:', e); }
+}
+
+async function loadJSON(url) {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } catch(_e1) {
+    try {
+      return await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', url);
+        xhr.onload = () => {
+          if (xhr.status === 200 || xhr.status === 0) {
+            try { resolve(JSON.parse(xhr.responseText)); }
+            catch(e) { reject(new Error('JSON解析失败: ' + e.message)); }
+          } else { reject(new Error(`XHR ${xhr.status}`)); }
+        };
+        xhr.onerror = () => reject(new Error('XHR请求失败'));
+        xhr.send();
+      });
+    } catch(_e2) {
+      throw new Error('请通过 HTTP 服务器访问<br>在目录下运行：<code>python3 -m http.server 8080</code><br>然后打开 http://localhost:8080');
+    }
+  }
+}
+
+// ─── Tag Index ──────────────────────────────────────────────────────
+function buildTagIndex() {
+  const map = new Map();
+  const files = data.files.filter(f => f.visible !== false);
+  const links = (data.links || []).filter(l => l.visible !== false);
+  files.forEach(f => { f.tags.forEach(t => { map.set(t, (map.get(t) || 0) + 1); }); });
+  links.forEach(l => { l.tags.forEach(t => { map.set(t, (map.get(t) || 0) + 1); }); });
+  allTags = [...map.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([name, count]) => ({ name, count }));
+}
+
+function tagColor(tagName) {
+  return data.tagColors[tagName] === 'red' ? 'red' : 'blue';
+}
+
+// ─── Sort ───────────────────────────────────────────────────────────
+function sortFiles(files) {
+  return [...files].sort((a, b) => {
+    // pinned first
+    if (a.pinned && !b.pinned) return -1;
+    if (!a.pinned && b.pinned) return 1;
+    // then by priority (higher = first)
+    if ((b.priority || 0) !== (a.priority || 0)) return (b.priority || 0) - (a.priority || 0);
+    // then by upload time (newer first)
+    return (b.uploadTime || '').localeCompare(a.uploadTime || '');
+  });
+}
+
+// ─── Search / Filter ────────────────────────────────────────────────
+function getFilteredRows() {
+  const visibleFiles = data.files.filter(f => f.visible !== false);
+  const visibleLinks = (data.links || []).filter(l => l.visible !== false).map(l => ({
+    kind: 'link', title: l.title, url: l.url, desc: l.desc, tags: l.tags,
+    pinned: l.pinned, priority: l.priority || 0
+  }));
+  let items = visibleFiles.map(f => ({ kind: 'file', ...f })).concat(visibleLinks);
+
+  if (activeTag) {
+    items = items.filter(it => it.tags.includes(activeTag));
+  }
+
+  if (searchQuery.trim()) {
+    const q = searchQuery.trim().toLowerCase();
+    const keywords = q.split(/\s+/).filter(Boolean);
+
+    items = items.map(it => {
+      const nameLower = (it.name || it.title || '').toLowerCase();
+      const descLower = (it.desc || '').toLowerCase();
+      const tagsLower = it.tags.map(t => t.toLowerCase());
+      let score = 0;
+
+      keywords.forEach(kw => {
+        if (nameLower.includes(kw)) {
+          score += 50;
+          if (new RegExp('\\b' + escapeRegex(kw)).test(nameLower)) score += 30;
+          if (nameLower.startsWith(kw)) score += 20;
+        }
+        // also search in link URL
+        if (it.url && it.url.toLowerCase().includes(kw)) score += 25;
+        tagsLower.forEach(t => {
+          if (t === kw) score += 80;
+          else if (t.includes(kw)) score += 30;
+        });
+        if (descLower.includes(kw)) score += 15;
+      });
+
+      const matchedKws = keywords.filter(kw =>
+        nameLower.includes(kw) || tagsLower.some(t => t.includes(kw)) || descLower.includes(kw)
+      ).length;
+      if (matchedKws === keywords.length) score += 20;
+
+      return { ...it, score, matched: score > 0 };
+    });
+
+    items = items.filter(r => r.matched).sort((a, b) => b.score - a.score);
+  } else {
+    items = sortFiles(items).map(it => ({ ...it, score: 0, matched: true }));
+  }
+
+  return items;
+}
+
+function escapeRegex(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+
+// ─── Render ─────────────────────────────────────────────────────────
+async function fetchViews() {
+  try {
+    const r = await fetch('/api.php?action=views');
+    viewsData = await r.json();
+    render();
+  } catch(e) { /* views optional */ }
+}
+
+function render() {
+  const rows = getFilteredRows();
+
+  // stats
+  const fc = rows.filter(r => r.kind !== 'link').length;
+  const lc = rows.filter(r => r.kind === 'link').length;
+  const parts = [];
+  if (fc) parts.push(`${fc} 个文件`);
+  if (lc) parts.push(`${lc} 个链接`);
+  document.getElementById('resultCount').textContent = `共 ${parts.join('、')}`;
+
+  // clear button
+  const clearBtn = document.getElementById('clearFilter');
+  if (activeTag || searchQuery) {
+    clearBtn.style.display = 'inline-block';
+    clearBtn.textContent = activeTag ? `✕ 清除标签「${activeTag}」` : '✕ 清除搜索';
+  } else { clearBtn.style.display = 'none'; }
+
+  // tag filters (show color-coded)
+  const tagContainer = document.getElementById('tagFilters');
+  tagContainer.innerHTML = allTags.map(t => {
+    const color = tagColor(t.name);
+    return `<button class="tag${activeTag === t.name ? ' active' : ''}${color === 'red' ? '' : ''}"
+      style="${color === 'red' ? 'background:var(--tag-red-bg);color:var(--tag-red-text)' : ''}"
+      data-tag="${escapeHtml(t.name)}">
+      ${escapeHtml(t.name)}<span class="count">${t.count}</span>
+    </button>`;
+  }).join('');
+
+  // file list
+  const list = document.getElementById('fileList');
+  const emptyState = document.getElementById('emptyState');
+
+  if (rows.length === 0) {
+    list.innerHTML = '';
+    emptyState.style.display = 'block';
+  } else {
+    emptyState.style.display = 'none';
+    const isSearch = !!searchQuery.trim();
+    list.innerHTML = rows.map(r => {
+      const pinned = r.pinned && !isSearch;
+      if (r.kind === 'link') {
+        const linkIdx = (data.links || []).indexOf(data.links.find(l => l.url === r.url));
+        return `
+        <div class="file-row link-row${pinned ? ' pinned' : ''}" data-kind="link" data-idx="${linkIdx}">
+          <div class="file-icon link-icon">🔗</div>
+          <div class="file-info">
+            <div class="file-title">
+              ${escapeHtml(r.title)}
+              ${pinned ? '<span class="pin-badge">📌 置顶</span>' : ''}
+              ${isSearch && r.score > 0 ? `<span class="relevance-badge">相关度 ${r.score}</span>` : ''}
+            </div>
+            <div class="file-desc" title="${escapeHtml(r.url)}">${escapeHtml(r.url)}</div>
+            ${r.desc ? `<div class="file-desc" style="color:var(--text-muted);font-size:12px">${escapeHtml(r.desc)}</div>` : ''}
+            <div class="file-tags">
+              ${r.tags.map(t => `<span class="file-tag ${tagColor(t)}">${escapeHtml(t)}</span>`).join('')}
+            </div>
+          </div>
+          <div class="file-actions">
+            <button class="btn-icon link-copy" title="复制链接" data-url="${escapeHtml(r.url)}">📋</button>
+            <button class="btn-icon link-newtab" title="新窗口打开" data-url="${escapeHtml(r.url)}">🔗</button>
+          </div>
+        </div>`;
+      }
+      const f = r;
+      const idx = data.files.indexOf(data.files.find(ff => ff.path === f.path));
+      return `
+        <div class="file-row${pinned ? ' pinned' : ''}" data-kind="file" data-idx="${idx}">
+          <div class="file-icon ${f.type}">${typeIcon(f.type)}</div>
+          <div class="file-info">
+            <div class="file-title">
+              ${escapeHtml(f.name)}
+              ${pinned ? '<span class="pin-badge">📌 置顶</span>' : ''}
+              ${isSearch && r.score > 0 ? `<span class="relevance-badge">相关度 ${r.score}</span>` : ''}
+            </div>
+            ${f.desc ? `<div class="file-desc" title="${escapeHtml(f.desc)}">${escapeHtml(f.desc)}</div>` : ''}
+            <div class="file-meta">
+              <span>${typeName(f.type)}</span><span class="dot"></span>
+              <span>${formatSize(f.sizeKB)}</span><span class="dot"></span>
+              <span>${f.uploadTime || '—'}</span>
+              ${viewsData[f.name] ? `<span class="dot"></span><span class="view-count">👁 ${formatViews(viewsData[f.name])}</span>` : ''}
+            </div>
+            <div class="file-tags">
+              ${f.tags.map(t => `<span class="file-tag ${tagColor(t)}">${escapeHtml(t)}</span>`).join('')}
+            </div>
+          </div>
+          <div class="file-actions">
+            <button class="btn-icon preview" title="预览" data-idx="${idx}">👁</button>
+            <button class="btn-icon download" title="下载" data-idx="${idx}">⬇</button>
+          </div>
+        </div>`;
+    }).join('');
+  }
+}
+
+function typeIcon(t) { return { pdf:'📄', excel:'📊', word:'📝', image:'🖼' }[t] || '📁'; }
+function typeName(t) { return { pdf:'PDF', excel:'Excel', word:'Word', image:'图片' }[t] || '文件'; }
+function formatSize(kb) { return kb >= 1024 ? (kb/1024).toFixed(1)+' MB' : Math.round(kb)+' KB'; }
+function formatViews(n) { return n >= 10000 ? (n/1000).toFixed(1)+'K' : n >= 1000 ? (n/1000).toFixed(1)+'K' : String(n); }
+function isMobile() { return /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) || ('ontouchstart' in window && window.innerWidth < 768); }
+function escapeHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+// ─── Preview ────────────────────────────────────────────────────────
+function getPreviewUrl(file) {
+  return location.protocol.startsWith('http') ? encodeURI(file.path) : file.path;
+}
+
+function openPreview(file) {
+  const url = getPreviewUrl(file);
+  const modal = document.getElementById('modal');
+  const title = document.getElementById('modalTitle');
+  const body = document.getElementById('modalBody');
+  title.textContent = file.name;
+
+  const isDeployed = location.protocol.startsWith('http') && !location.hostname.includes('localhost');
+
+  switch(file.type) {
+    case 'image':
+      body.innerHTML = `<img src="${url}" alt="${escapeHtml(file.name)}" loading="lazy">`;
+      break;
+    case 'pdf':
+      modal.classList.add('fullscreen');
+      if (isMobile()) {
+        body.innerHTML = `<div class="pdf-canvas-wrap" id="pdfCanvasWrap"><div class="pdf-loading">加载中…</div></div>`;
+        renderPDF(url);
+      } else {
+        body.innerHTML = `<iframe src="${url}" title="${escapeHtml(file.name)}" loading="lazy"></iframe>`;
+      }
+      break;
+    case 'word':
+    case 'excel':
+      if (isDeployed) {
+        const fullUrl = new URL(url, location.href).href;
+        body.innerHTML = `<iframe src="https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(fullUrl)}" title="${escapeHtml(file.name)}" loading="lazy"></iframe>`;
+      } else {
+        body.innerHTML = `<div class="unsupported"><p style="font-size:40px">📄</p><p>本地无法预览 Office 文件</p><p style="font-size:12px;color:var(--text-secondary)">部署到线上后将支持在线预览</p><a href="${url}" download>⬇ 下载查看</a></div>`;
+      }
+      break;
+    default:
+      body.innerHTML = `<div class="unsupported"><p style="font-size:40px">📦</p><p>此文件类型暂不支持预览</p><a href="${url}" download>⬇ 下载文件</a></div>`;
+  }
+
+  modal.classList.add('show');
+  document.body.style.overflow = 'hidden';
+}
+
+// ─── PDF.js Viewer ─────────────────────────────────────────────────
+let _pdfDoc = null;
+let _pdfPage = 1;
+let _pdfTotal = 0;
+let _pdfRenderTask = null;
+
+function removePDFControls() {
+  const c = document.getElementById('pdfControls');
+  if (c) c.remove();
+}
+
+async function renderPDF(url) {
+  removePDFControls();
+  if (typeof pdfjsLib === 'undefined') {
+    document.getElementById('pdfCanvasWrap').innerHTML =
+      '<div class="pdf-loading">⚠️ PDF.js 加载失败，请检查网络</div>';
+    return;
+  }
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+  try {
+    _pdfDoc = await pdfjsLib.getDocument(url).promise;
+    _pdfTotal = _pdfDoc.numPages;
+    _pdfPage = 1;
+    await renderCurrentPage();
+    addPDFControls();
+  } catch(e) {
+    document.getElementById('pdfCanvasWrap').innerHTML =
+      `<div class="pdf-loading">⚠️ PDF 加载失败<br><small>${e.message}</small></div>`;
+    _pdfDoc = null;
+  }
+}
+
+async function renderCurrentPage() {
+  if (_pdfRenderTask) _pdfRenderTask.cancel();
+  const wrap = document.getElementById('pdfCanvasWrap');
+  if (!wrap || !_pdfDoc) return;
+
+  wrap.innerHTML = '<div class="pdf-loading">渲染中…</div>';
+
+  const page = await _pdfDoc.getPage(_pdfPage);
+  const vp = page.getViewport({ scale: 1 });
+  const containerWidth = wrap.clientWidth || 600;
+  const cssScale = Math.min((containerWidth - 16) / vp.width, 2);
+  const dpr = window.devicePixelRatio || 1;
+  const scaledVp = page.getViewport({ scale: cssScale * dpr });
+
+  const canvas = document.createElement('canvas');
+  canvas.width = scaledVp.width;
+  canvas.height = scaledVp.height;
+  canvas.style.width = (scaledVp.width / dpr) + 'px';
+  canvas.style.height = (scaledVp.height / dpr) + 'px';
+
+  wrap.innerHTML = '';
+  wrap.appendChild(canvas);
+
+  _pdfRenderTask = page.render({ canvasContext: canvas.getContext('2d'), viewport: scaledVp });
+  await _pdfRenderTask.promise;
+  updatePDFPageNum();
+}
+
+function addPDFControls() {
+  removePDFControls();
+  const bar = document.createElement('div');
+  bar.id = 'pdfControls';
+  bar.className = 'pdf-controls';
+  bar.innerHTML = `
+    <button class="pdf-ctrl-btn" id="pdfPrev" ${_pdfPage<=1?'disabled':''}>‹</button>
+    <span class="pdf-page-num" id="pdfPageNum">${_pdfPage} / ${_pdfTotal}</span>
+    <button class="pdf-ctrl-btn" id="pdfNext" ${_pdfPage>=_pdfTotal?'disabled':''}>›</button>
+  `;
+  document.body.appendChild(bar);
+
+  document.getElementById('pdfPrev').addEventListener('click', async () => {
+    if (_pdfPage <= 1) return;
+    _pdfPage--;
+    updatePDFBtnState();
+    await renderCurrentPage();
+  });
+  document.getElementById('pdfNext').addEventListener('click', async () => {
+    if (_pdfPage >= _pdfTotal) return;
+    _pdfPage++;
+    updatePDFBtnState();
+    await renderCurrentPage();
+  });
+}
+
+function updatePDFBtnState() {
+  const prev = document.getElementById('pdfPrev');
+  const next = document.getElementById('pdfNext');
+  if (prev) prev.disabled = _pdfPage <= 1;
+  if (next) next.disabled = _pdfPage >= _pdfTotal;
+}
+
+function updatePDFPageNum() {
+  const el = document.getElementById('pdfPageNum');
+  if (el) el.textContent = `${_pdfPage} / ${_pdfTotal}`;
+}
+
+function closePreview() {
+  if (_pdfRenderTask) { _pdfRenderTask.cancel(); _pdfRenderTask = null; }
+  _pdfDoc = null; _pdfPage = 1; _pdfTotal = 0;
+  removePDFControls();
+  const modal = document.getElementById('modal');
+  modal.style.display = '';
+  modal.classList.remove('show', 'fullscreen');
+  document.body.style.overflow = '';
+  document.getElementById('modalBody').innerHTML = '';
+}
+
+function downloadFile(file) {
+  const a = document.createElement('a');
+  a.href = getPreviewUrl(file);
+  a.download = file.name;
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+// ─── Events ─────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  init();
+
+  document.getElementById('search').addEventListener('input', e => {
+    if (e.target.value === ADMIN_CODE) { e.target.value = ''; searchQuery = ''; openAdmin(); return; }
+    searchQuery = e.target.value;
+    activeTag = null;
+    render();
+  });
+
+  document.getElementById('tagFilters').addEventListener('click', e => {
+    const tagBtn = e.target.closest('.tag');
+    if (!tagBtn) return;
+    const tag = tagBtn.dataset.tag;
+    activeTag = activeTag === tag ? null : tag;
+    searchQuery = '';
+    document.getElementById('search').value = '';
+    render();
+  });
+
+  document.getElementById('clearFilter').addEventListener('click', () => {
+    activeTag = null; searchQuery = '';
+    document.getElementById('search').value = '';
+    render();
+  });
+
+  document.getElementById('fileList').addEventListener('click', e => {
+    const btn = e.target.closest('button');
+    const row = e.target.closest('.file-row');
+
+    // Link actions
+    if (btn && btn.classList.contains('link-copy')) {
+      e.stopPropagation();
+      navigator.clipboard.writeText(btn.dataset.url).then(() => {
+        btn.textContent = '✓';
+        setTimeout(() => { btn.textContent = '📋'; }, 1500);
+      }).catch(() => {});
+      return;
+    }
+    if (btn && btn.classList.contains('link-newtab')) {
+      e.stopPropagation();
+      window.open(btn.dataset.url, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
+    // File actions
+    if (btn && btn.classList.contains('download')) {
+      e.stopPropagation();
+      downloadFile(data.files[parseInt(btn.dataset.idx)]);
+      return;
+    }
+    if (btn && btn.classList.contains('preview')) {
+      e.stopPropagation();
+      openPreview(data.files[parseInt(btn.dataset.idx)]);
+      return;
+    }
+
+    // Row click
+    if (row) {
+      if (row.dataset.kind === 'link') {
+        window.open(data.links[parseInt(row.dataset.idx)].url, '_blank', 'noopener,noreferrer');
+      } else {
+        openPreview(data.files[parseInt(row.dataset.idx)]);
+      }
+    }
+  });
+
+  document.getElementById('modalClose').addEventListener('click', closePreview);
+  document.getElementById('modal').addEventListener('click', e => {
+    if (e.target === e.currentTarget) closePreview();
+  });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closePreview(); });
+
+  // ─── Tab Switching ───────────────────────────────────────────
+  const tabNav = document.getElementById('tabNav');
+  tabNav.addEventListener('click', e => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    tabNav.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const target = btn.dataset.tab;
+    document.getElementById('tab-files').classList.toggle('active', target === 'files');
+    document.getElementById('tab-qr').classList.toggle('active', target === 'qr');
+    document.getElementById('tab-qa').classList.toggle('active', target === 'qa');
+    // Hide search/filter UI on QR tab
+    const searchWrap = document.querySelector('.search-wrap');
+    const tagsSection = document.querySelector('.tags-section');
+    const statsBar = document.querySelector('.stats-bar');
+    if (target === 'qr') { renderQR(); }
+    if (target === 'qr' || target === 'qa') {
+      searchWrap.style.display = 'none';
+      tagsSection.style.display = 'none';
+      statsBar.style.display = 'none';
+    } else {
+      searchWrap.style.display = '';
+      tagsSection.style.display = '';
+      statsBar.style.display = '';
+    }
+  });
+
+  // ─── QR Code ─────────────────────────────────────────────────
+  let qrActiveCat = '全部';
+
+  function renderQRTabs() {
+    const cats = new Set(qrData.items.filter(i => i.visible !== false).map(i => i.category));
+    const all = ['全部', ...cats];
+    const inner = document.getElementById('qrTabInner');
+    inner.innerHTML = all.map(c =>
+      `<button class="qr-tab-btn${c === qrActiveCat ? ' active' : ''}" data-cat="${c}">${escapeHtml(c)}</button>`
+    ).join('');
+    inner.addEventListener('click', e2 => {
+      const b = e2.target.closest('.qr-tab-btn');
+      if (!b) return;
+      qrActiveCat = b.dataset.cat;
+      renderQRTabs();
+      renderQRGrid();
+    });
+  }
+
+  function renderQRGrid() {
+    let items = qrData.items.filter(i => i.visible !== false);
+    if (qrActiveCat !== '全部') items = items.filter(i => i.category === qrActiveCat);
+    items.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
+
+    const grid = document.getElementById('qrGrid');
+    const empty = document.getElementById('qrEmpty');
+    if (items.length === 0) { grid.innerHTML = ''; empty.style.display = 'block'; return; }
+    empty.style.display = 'none';
+
+    grid.innerHTML = items.map((item, i) => `
+      <div class="qr-card" data-qr-idx="${i}" data-image="${escapeHtml(item.image)}" data-title="${escapeHtml(item.title)}">
+        <div class="qr-img-wrap"><img src="${escapeHtml(item.image)}" alt="${escapeHtml(item.title)}" loading="lazy"></div>
+        <div class="qr-body">
+          <div class="qr-title">${escapeHtml(item.title)}</div>
+          ${item.desc ? `<div class="qr-desc">${escapeHtml(item.desc)}</div>` : ''}
+          <div class="qr-footer">
+            <span class="qr-cat">${escapeHtml(item.category)}</span>
+            ${item.pinned ? '<span class="qr-pin">📌</span>' : ''}
+          </div>
+        </div>
+      </div>`).join('');
+
+    grid.querySelectorAll('.qr-card').forEach(card => {
+      card.addEventListener('click', () => {
+        openQRPreview(card.dataset.image, card.dataset.title);
+      });
+    });
+  }
+
+  function openQRPreview(src, title) {
+    const modal = document.getElementById('modal');
+    const mTitle = document.getElementById('modalTitle');
+    const mBody = document.getElementById('modalBody');
+    mTitle.textContent = title;
+    mBody.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;min-height:40dvh"><img src="${src}" style="max-width:100%;max-height:75dvh;border-radius:8px" alt="${escapeHtml(title)}"></div>`;
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+  }
+
+  function renderQR() {
+    renderQRTabs();
+    renderQRGrid();
+    renderChinaMap();
+  }
+
+  // ─── China Map (GeoJSON) ────────────────────────────────────
+  var chinaGeoData = null;
+
+  async function loadChinaGeo() {
+    if (chinaGeoData) return chinaGeoData;
+    var r = await fetch('中华人民共和国.geojson');
+    if (!r.ok) throw new Error('HTTP '+r.status);
+    chinaGeoData = await r.json();
+    return chinaGeoData;
+  }
+
+  function project(lon, lat, W, H) {
+    var pad = 15, minLon = 73, maxLon = 136, minLat = 17, maxLat = 54;
+    var x = (lon - minLon) / (maxLon - minLon) * (W - pad*2) + pad;
+    var y = (1 - (lat - minLat) / (maxLat - minLat)) * (H - pad*2) + pad;
+    return [x, y];
+  }
+
+  function ringToD(ring, W, H) {
+    var d = '', i;
+    for (i = 0; i < ring.length; i++) {
+      var p = project(ring[i][0], ring[i][1], W, H);
+      d += (i ? 'L' : 'M') + p[0].toFixed(1) + ',' + p[1].toFixed(1);
+    }
+    return d + 'Z';
+  }
+
+  async function renderChinaMap() {
+    var el = document.getElementById('chinaMap');
+    el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-muted);font-size:12px">加载地图…</div>';
+    try {
+      var geo = await loadChinaGeo();
+      var hometown = qrData.hometown || {};
+      var W = 600, H = 500;
+
+      // Build SVG markup
+      var paths = '';
+      var activeNames = [];
+      geo.features.forEach(function(f) {
+        var name = f.properties.name;
+        var has = !!hometown[name];
+        var cls = has ? 'mp-active' : 'mp-inactive';
+        if (has) activeNames.push(name);
+        var d = '';
+        var geom = f.geometry;
+        if (geom.type === 'Polygon') {
+          geom.coordinates.forEach(function(ring) { d += ringToD(ring, W, H) + ' '; });
+        } else if (geom.type === 'MultiPolygon') {
+          geom.coordinates.forEach(function(poly) { poly.forEach(function(ring) { d += ringToD(ring, W, H) + ' '; }); });
+        }
+        var ttl = has ? escAttr(hometown[name].title || name) : escAttr(name);
+        paths += '<path class="' + cls + '" d="' + d.trim() + '" data-p="' + escAttr(name) + '"><title>' + ttl + '</title></path>';
+      });
+
+      var svgStr = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + W + ' ' + H + '" width="100%" height="100%">' +
+        '<style>.mp-inactive{fill:#e0e0e0}.mp-active{fill:#6366f1;cursor:pointer;opacity:.7}.mp-active:hover{opacity:1}</style>' +
+        paths + '</svg>';
+
+      // Parse as proper SVG document
+      var parser = new DOMParser();
+      var svgDoc = parser.parseFromString(svgStr, 'image/svg+xml');
+      var svg = svgDoc.documentElement;
+      svg.style.maxWidth = '600px';
+      svg.style.display = 'block';
+      svg.style.margin = '0 auto';
+      svg.style.background = 'var(--bg)';
+      svg.style.borderRadius = '8px';
+      svg.style.border = '1px solid var(--border)';
+
+      el.innerHTML = '';
+      el.appendChild(document.importNode(svg, true));
+
+      // Attach handlers to active paths
+      el.querySelectorAll('.mp-active').forEach(function(p) {
+        var nm = p.getAttribute('data-p');
+        p.addEventListener('click', function(e) { e.stopPropagation(); openHometown(nm); });
+        p.addEventListener('mouseenter', function(e) { showMapThumb(e, nm); });
+        p.addEventListener('mouseleave', hideMapThumb);
+        p.addEventListener('mousemove', function(e) { moveMapThumb(e); });
+      });
+
+      if (activeNames.length === 0) {
+        document.getElementById('hmTags').innerHTML = '<p style="font-size:12px;color:var(--text-muted);text-align:center;padding:8px">暂无老乡群</p>';
+      }
+    } catch(e) {
+      el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:12px">地图加载失败: '+(e.message||'?')+'</div>';
+    }
+  }
+
+  var mapThumb = null;
+  function showMapThumb(e, prov) {
+    if (!mapThumb) { mapThumb = document.createElement('div'); mapThumb.id = 'mapThumb'; document.body.appendChild(mapThumb); }
+    var d = (qrData.hometown||{})[prov]; if (!d) return;
+    mapThumb.innerHTML = '<div style="font-size:11px;font-weight:600;margin-bottom:4px;text-align:center">' + escHtml(d.title||prov) + '</div><img src="' + escAttr(d.image) + '" style="width:100px;height:100px;object-fit:contain;border-radius:4px">';
+    mapThumb.style.display = 'block'; moveMapThumb(e);
+  }
+  function moveMapThumb(e) {
+    if (!mapThumb) return;
+    mapThumb.style.left = (e.clientX+12)+'px'; mapThumb.style.top = (e.clientY-120)+'px';
+  }
+  function hideMapThumb() { if (mapThumb) mapThumb.style.display = 'none'; }
+
+  function openHometown(prov) {
+    var d = (qrData.hometown||{})[prov]; if (!d) return;
+    document.getElementById('hmTitle').textContent = d.title || prov+'老乡群';
+    document.getElementById('hmImg').src = d.image || '';
+    document.getElementById('hmOverlay').classList.add('show');
+  }
+  function closeHometown() {
+    var o = document.getElementById('hmOverlay');
+    o.classList.remove('show');
+    o.style.display = '';
+  }
+  document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeHometown(); });
+  document.getElementById('hmOverlay').addEventListener('click', closeHometown);
+  document.getElementById('hmCard').addEventListener('click', function(e) { e.stopPropagation(); });
+  document.getElementById('hmClose').addEventListener('click', closeHometown);
+
+  function escAttr(s) { return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function escHtml(s) { var d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+  // Tab switching already handled above
+
+  // ─── Admin Panel v4 ──────────────────────────────────────────
+  const ADMIN_CODE = '19541954';
+  let adminSeq = '', adminToken = '', adminFiles = [];
+
+  document.addEventListener('keydown', e => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    adminSeq += e.key;
+    if (adminSeq.length > ADMIN_CODE.length) adminSeq = adminSeq.slice(-ADMIN_CODE.length);
+    if (adminSeq === ADMIN_CODE) {
+      adminSeq = '';
+      e.preventDefault(); e.stopPropagation();
+      openAdmin();
+    }
+  });
+
+  const adOverlay = document.getElementById('adminOverlay');
+  const adToast = document.getElementById('adminToast');
+
+  function apiHeaders() {
+    const h = {};
+    if (adminToken) h['X-Admin-Token'] = adminToken;
+    return h;
+  }
+
+  async function apiFetch(url, opts = {}) {
+    const merged = { ...opts };
+    merged.headers = { ...apiHeaders(), ...(opts.headers || {}) };
+    const res = await fetch(url, merged);
+    const text = await res.text();
+    if (text.trim().startsWith('<')) throw new Error('API 响应异常，请检查 api.php 是否正确部署');
+    let data;
+    try { data = JSON.parse(text); } catch (_) { throw new Error('API 返回格式错误'); }
+    if (res.status === 401) { adminToken = ''; showAuth(); throw new Error('登录已过期，请重新输入密码'); }
+    if (data.error) throw new Error(data.error);
+    return { data, res };
+  }
+
+  function showToast(msg, type = 'success') {
+    adToast.textContent = msg; adToast.className = 'admin-toast ' + type;
+    adToast.style.display = 'block';
+    setTimeout(() => { adToast.style.display = 'none'; }, 3500);
+  }
+
+
+  // ─── Q&A ───────────────────────────────────────────────────
+  let qaLoaded = false;
+  let jokeBuf = '';
+  let qaTapCount = 0;
+  let qaTapTimer = null;
+
+  async function loadQA(file) {
+    const div = document.getElementById('qaContent');
+    div.innerHTML = '<div class="qa-empty">加载中…</div>';
+    try {
+      const url = '/api.php?action=qa' + (file ? '&file=' + encodeURIComponent(file) : '');
+      const r = await fetch(url);
+      const d = await r.json();
+      if (d.error) throw new Error(d.error);
+      div.innerHTML = '<div class="qa-detail">' + renderMarkdown(d.content) + '</div>';
+    } catch(e) { div.innerHTML = '<div class="qa-empty">⚠️ 加载失败</div>'; }
+  }
+
+  // Keyboard easter egg (desktop)
+  document.addEventListener('keydown', function(e) {
+    if (!document.getElementById('tab-qa').classList.contains('active')) return;
+    if (e.key.length === 1) {
+      jokeBuf += e.key.toLowerCase();
+      if (jokeBuf.length > 10) jokeBuf = jokeBuf.slice(-10);
+      if (jokeBuf.endsWith('joke')) { jokeBuf = ''; loadQA('joke.md'); }
+    }
+  });
+
+  // Tap easter egg (mobile) - 8 taps on QA button within 3s
+  function onQATap() {
+    qaTapCount++;
+    clearTimeout(qaTapTimer);
+    qaTapTimer = setTimeout(function() { qaTapCount = 0; }, 3000);
+    if (qaTapCount >= 8) { qaTapCount = 0; clearTimeout(qaTapTimer); loadQA('joke.md'); }
+  }
+  var qaBtn = document.querySelector('[data-tab="qa"]');
+  qaBtn.addEventListener('touchstart', onQATap);
+  qaBtn.addEventListener('click', onQATap);
+  // Also count taps on the QA content area
+  document.getElementById('qaContent').addEventListener('click', function() {
+    if (document.getElementById('tab-qa').classList.contains('active')) onQATap();
+  });
+
+  // Load Q&A when tab first switched
+  document.getElementById('tabNav').addEventListener('click', function(e) {
+    var btn = e.target.closest('button');
+    if (btn && btn.dataset.tab === 'qa' && !qaLoaded) { qaLoaded = true; loadQA(); }
+  });
+
+  function renderMarkdown(md) {
+    var h = md;
+    h = h.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
+    h = h.replace(/^#### (.+)$/gm, '<h4>$1</h4>');
+    h = h.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+    h = h.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+    h = h.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+    h = h.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    h = h.replace(/\*(.+?)\*/g, '<em>$1</em>');
+    h = h.replace(/`([^`]+)`/g, '<code>$1</code>');
+    h = h.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+    h = h.replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>');
+    h = h.replace(/^---$/gm, '<hr>');
+    h = h.replace(/^- (.+)$/gm, '<li>$1</li>');
+    h = h.replace(/((?:<li>[^<]*<\/li>\n?)+)/g, '<ul>$1</ul>');
+    h = h.replace(/^([^<\n].*)/gm, '<p>$1</p>');
+    h = h.replace(/<p><\/p>/g, '');
+    h = h.replace(/\n/g, '');
+    return h;
+  }
+
+  // ─── Auth Step ───────────────────────────────────────────────
+  function showAuth() {
+    document.getElementById('adStepAuth').style.display = 'block';
+    document.getElementById('adStepUpload').style.display = 'none';
+    document.getElementById('adPassword').value = '';
+    document.getElementById('adAuthError').textContent = '';
+  }
+
+  function showUpload() {
+    document.getElementById('adStepAuth').style.display = 'none';
+    document.getElementById('adStepUpload').style.display = 'block';
+    document.getElementById('adStepStats').style.display = 'none';
+    adminFiles = [];
+    renderFileList();
+    loadExistingFiles();
+    loadExistingLinks();
+  }
+
+  function openAdmin() {
+    adOverlay.classList.add('show');
+    document.body.style.overflow = 'hidden';
+    if (adminToken) showUpload(); else { showAuth(); document.getElementById('adPassword').focus(); }
+  }
+
+  function closeAdmin() {
+    adOverlay.classList.remove('show');
+    document.body.style.overflow = '';
+    adminFiles = [];
+    renderFileList();
+  }
+
+  async function doAuth() {
+    const pw = document.getElementById('adPassword').value;
+    if (!pw) return;
+    const btn = document.getElementById('adAuthBtn');
+    btn.disabled = true; btn.textContent = '验证中…';
+    try {
+      const { data } = await apiFetch('/api.php?action=auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: pw }),
+      });
+      adminToken = data.token;
+      showUpload();
+    } catch (e) {
+      document.getElementById('adAuthError').textContent = e.message;
+    }
+    btn.disabled = false; btn.textContent = '验证';
+  }
+
+  document.getElementById('adAuthBtn').addEventListener('click', doAuth);
+  document.getElementById('adPassword').addEventListener('keydown', e => {
+    if (e.key === 'Enter') doAuth();
+  });
+
+  // ─── Close ───────────────────────────────────────────────────
+  document.getElementById('adminClose').addEventListener('click', closeAdmin);
+
+  // ─── Upload Step v4: multi-file ──────────────────────────────
+  const adDrop = document.getElementById('adminDrop');
+  const adFileInput = document.getElementById('adminFileInput');
+  const adFileList = document.getElementById('adFileList');
+  const adAIAll = document.getElementById('adAIAll');
+
+  adDrop.addEventListener('click', () => adFileInput.click());
+  adDrop.addEventListener('dragover', e => { e.preventDefault(); adDrop.classList.add('dragover'); });
+  adDrop.addEventListener('dragleave', () => adDrop.classList.remove('dragover'));
+  adDrop.addEventListener('drop', e => {
+    e.preventDefault(); adDrop.classList.remove('dragover');
+    if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files);
+  });
+  adFileInput.addEventListener('change', () => {
+    if (adFileInput.files.length) handleFiles(adFileInput.files);
+  });
+
+  adAIAll.addEventListener('click', async () => {
+    adAIAll.disabled = true; adAIAll.textContent = '🤖 填充中…';
+    for (let i = 0; i < adminFiles.length; i++) {
+      if (!adminFiles[i].tags || !adminFiles[i].tags.length) {
+        await aiFillFile(i);
+      }
+    }
+    adAIAll.disabled = false; adAIAll.textContent = '🤖 全部 AI 填充';
+  });
+
+  document.getElementById('elAddBtn').addEventListener('click', doAddLink);
+
+  // ─── Stats ──────────────────────────────────────────────────
+  const STATS_COLORS = ['#6366f1','#22c55e','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#ec4899','#84cc16','#f97316','#14b8a6','#3b82f6','#a855f7','#e11d48','#0ea5e9','#65a30d','#d946ef','#0891b2','#b45309','#2563eb','#c026d3'];
+  let stFileColor = {};
+
+  document.getElementById('adShowStats').addEventListener('click', e => { e.preventDefault(); showStats(); });
+  document.getElementById('adStatsBack').addEventListener('click', () => { showUpload(); });
+  document.getElementById('stSearch').addEventListener('input', () => renderStats());
+
+  async function showStats() {
+    document.getElementById('adStepUpload').style.display = 'none';
+    document.getElementById('adStepStats').style.display = 'block';
+    try {
+      const { data } = await apiFetch('/api.php?action=stats');
+      window._statsData = data;
+      renderStats();
+    } catch(e) {
+      document.getElementById('stCards').innerHTML = '<p>加载失败: ' + e.message + '</p>';
+    }
+  }
+
+  function renderStats() {
+    const d = window._statsData;
+    if (!d) return;
+
+    // Summary cards
+    document.getElementById('stCards').innerHTML =
+      `<div class="st-card"><div class="v">${d.total_pv||0}</div><div class="l">页面访问</div></div>` +
+      `<div class="st-card"><div class="v">${d.total_fv||0}</div><div class="l">文件浏览</div></div>` +
+      `<div class="st-card"><div class="v">${(d.daily||[]).length}</div><div class="l">天数</div></div>`;
+
+    // Assign colors
+    const allFiles = new Set();
+    (d.daily||[]).forEach(dd => dd.files.forEach(f => allFiles.add(f.name)));
+    const flist = [...allFiles];
+    flist.forEach((f,i) => { stFileColor[f] = STATS_COLORS[i % STATS_COLORS.length]; });
+
+    // Find max file total for bar scaling
+    let maxfv = 1;
+    (d.daily||[]).forEach(dd => { maxfv = Math.max(maxfv, dd.ftotal||0); });
+
+    const search = (document.getElementById('stSearch').value || '').toLowerCase();
+
+    // Table body
+    document.getElementById('stBody').innerHTML = (d.daily||[]).map(day => {
+      const barSegs = (day.files||[]).filter(f => !search || f.name.toLowerCase().includes(search)).map(f => {
+        const w = (f.count / maxfv * 100).toFixed(1);
+        return `<span class="st-bar-seg" style="width:${w}%;background:${stFileColor[f.name]||'#888'}"
+          onmouseenter="showTip(event,'${escapeHtml(f.name)}: ${f.count}')" onmouseleave="hideTip()"></span>`;
+      }).join('');
+      return `<tr>
+        <td class="st-date">${day.date}</td>
+        <td>${day.pages||0}</td>
+        <td class="st-bar-cell">
+          <div class="st-bar-wrap">${barSegs}</div>
+          <span class="st-bar-total">${day.ftotal||0}</span>
+        </td>
+      </tr>`;
+    }).join('');
+  }
+
+  window.showTip = function(e, text) {
+    const tip = document.getElementById('stTip');
+    tip.textContent = text;
+    tip.style.display = 'block';
+    tip.style.left = e.clientX + 12 + 'px';
+    tip.style.top = e.clientY - 8 + 'px';
+  };
+  window.hideTip = function() {
+    document.getElementById('stTip').style.display = 'none';
+  };
+
+  function getFileType(name) {
+    const ext = (name || '').split('.').pop().toLowerCase();
+    const map = { pdf:'pdf', doc:'word', docx:'word', xls:'excel', xlsx:'excel',
+                  jpg:'image', jpeg:'image', png:'image', gif:'image', webp:'image' };
+    return map[ext] || 'other';
+  }
+
+  async function handleFiles(files) {
+    console.log('handleFiles called with', files.length, 'files');
+    for (const file of files) {
+      if (file.size > 50 * 1024 * 1024) {
+        showToast('⚠️ ' + file.name + ' 超过 50MB，跳过', 'error');
+        continue;
+      }
+      const idx = adminFiles.length;
+      const af = {
+        file, idx, status: 'uploading', progress: 0,
+        saved_as: null, size_kb: 0, path: '',
+        title: file.name, desc: '', tags: [], priority: 5, source: ''
+      };
+      adminFiles.push(af);
+      renderFileList();
+
+      // Upload
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        const uploadRes = await fetch('/api.php?action=upload', {
+          method: 'POST',
+          headers: apiHeaders(),
+          body: formData,
+        });
+        const uploadText = await uploadRes.text();
+        if (!uploadRes.ok || uploadText.trim().startsWith('<')) {
+          const preview = uploadText.replace(/<[^>]+>/g, ' ').trim().slice(0, 200) || '(空)';
+          throw new Error(`HTTP ${uploadRes.status}: ${preview}`);
+        }
+        const uploadData = JSON.parse(uploadText);
+        if (uploadData.error) throw new Error(uploadData.error);
+
+        af.status = 'ok';
+        af.saved_as = uploadData.saved_as;
+        af.size_kb = uploadData.size_kb;
+        af.path = uploadData.path;
+        if (uploadData.suggest) {
+          af.title = uploadData.suggest.title || file.name;
+          af.desc = uploadData.suggest.desc || '';
+          af.tags = uploadData.suggest.tags || [];
+          af.priority = uploadData.suggest.priority || 5;
+          af.source = uploadData.suggest.source || '';
+        }
+      } catch (e) {
+        af.status = 'error';
+        af.error = e.message;
+      }
+      renderFileList();
+    }
+    adFileInput.value = '';
+    adAIAll.style.display = adminFiles.some(f => f.status === 'ok') ? '' : 'none';
+  }
+
+  function renderFileList() {
+    if (!adFileList) return;
+    adFileList.innerHTML = adminFiles.map((af, i) => {
+      const statusText = { uploading: '上传中…', ok: '✅', error: '❌' }[af.status];
+      const statusCls = { uploading: 'up', ok: 'ok', error: 'err' }[af.status];
+      let extra = '';
+      if (af.status === 'uploading') extra = `<div class="af-progress"><div class="af-progress-bar" style="width:${af.progress||5}%"></div></div>`;
+      if (af.status === 'error') extra = `<span style="font-size:11px;color:#721c24">${escapeHtml(af.error||'')}</span>`;
+
+      const tagsHtml = (af.tags || []).map(t =>
+        `<span class="af-tag-chip">${escapeHtml(t)}<span class="rm" data-idx="${i}" data-tag="${escapeHtml(t)}">×</span></span>`
+      ).join('');
+
+      const sourceText = af.source === 'llm' ? '🤖 AI 生成' : (af.source === 'rule' ? '📋 规则匹配' : '');
+      const showEdit = af.status === 'ok';
+      const expanded = af._expanded !== false && showEdit; // default expanded after upload
+      const icon = { pdf: '📄', word: '📝', excel: '📊', image: '🖼️' }[getFileType(af.saved_as || af.file.name)] || '📎';
+
+      return `<div class="af-item${expanded ? ' expanded' : ''}" data-idx="${i}">
+        <div class="af-item-header" data-action="toggle" data-idx="${i}">
+          <span class="af-icon">${icon}</span>
+          <span class="af-name">${escapeHtml(af.saved_as || af.file.name)}</span>
+          <span class="af-size">${af.size_kb ? af.size_kb + ' KB' : (af.file.size/1024).toFixed(1) + ' KB'}</span>
+          <span class="af-status ${statusCls}">${statusText}</span>${extra}
+        </div>
+        ${showEdit ? `
+        <div class="af-body">
+          <label>显示名称<input type="text" data-idx="${i}" data-field="title" value="${escapeHtml(af.title||'')}"></label>
+          <label>描述<textarea data-idx="${i}" data-field="desc">${escapeHtml(af.desc||'')}</textarea></label>
+          <label>标签<div class="af-tag-chips" data-idx="${i}">${tagsHtml||'<span style="font-size:11px;color:var(--text-muted)">无标签</span>'}</div>
+            <input class="af-tag-input" data-idx="${i}" data-field="tag" placeholder="+ 标签" maxlength="12">
+          </label>
+          <label>优先级 (1最高)<input type="number" data-idx="${i}" data-field="priority" value="${af.priority||5}" min="1" max="5" style="width:64px"></label>
+          ${sourceText ? `<div class="af-source">来源：${sourceText}</div>` : ''}
+        </div>
+        <div class="af-bar">
+          <button class="af-ai-btn" data-action="ai" data-idx="${i}">🤖 AI 填充</button>
+          <button class="af-save-btn" data-action="save" data-idx="${i}">保存</button>
+        </div>` : ''}
+      </div>`;
+    }).join('');
+
+    // Event delegation
+    adFileList.querySelectorAll('[data-action="toggle"]').forEach(el => {
+      el.addEventListener('click', () => {
+        const idx = parseInt(el.dataset.idx);
+        adminFiles[idx]._expanded = !adminFiles[idx]._expanded;
+        renderFileList();
+      });
+    });
+    adFileList.querySelectorAll('[data-action="ai"]').forEach(el => {
+      el.addEventListener('click', async () => {
+        const idx = parseInt(el.dataset.idx);
+        el.disabled = true; el.textContent = '⏳ 分析中…';
+        await aiFillFile(idx);
+        el.disabled = false; el.textContent = '🤖 AI 填充';
+      });
+    });
+    adFileList.querySelectorAll('[data-action="save"]').forEach(el => {
+      el.addEventListener('click', async () => {
+        const idx = parseInt(el.dataset.idx);
+        await saveFile(idx);
+      });
+    });
+    // Inline field changes
+    adFileList.querySelectorAll('input[data-field], textarea[data-field]').forEach(el => {
+      el.addEventListener('change', () => {
+        const idx = parseInt(el.dataset.idx);
+        const field = el.dataset.field;
+        if (field === 'title') adminFiles[idx].title = el.value;
+        else if (field === 'desc') adminFiles[idx].desc = el.value;
+        else if (field === 'priority') adminFiles[idx].priority = parseInt(el.value) || 5;
+      });
+    });
+    // Tag inputs
+    adFileList.querySelectorAll('.af-tag-input').forEach(el => {
+      el.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && el.value.trim()) {
+          e.preventDefault();
+          const idx = parseInt(el.dataset.idx);
+          const tag = el.value.trim();
+          if (!adminFiles[idx].tags.includes(tag)) {
+            adminFiles[idx].tags.push(tag);
+            renderFileList();
+          }
+          el.value = '';
+        }
+      });
+    });
+    // Tag remove
+    adFileList.querySelectorAll('.af-tag-chip .rm').forEach(el => {
+      el.addEventListener('click', e => {
+        e.stopPropagation();
+        const idx = parseInt(el.dataset.idx);
+        const tag = el.dataset.tag;
+        adminFiles[idx].tags = adminFiles[idx].tags.filter(t => t !== tag);
+        renderFileList();
+      });
+    });
+  }
+
+  async function aiFillFile(idx) {
+    const af = adminFiles[idx];
+    if (af.status !== 'ok') return;
+    try {
+      const { data } = await apiFetch('/api.php?action=ai-suggest', {
+        method: 'POST',
+        body: JSON.stringify({ filename: af.saved_as || af.file.name }),
+      });
+      af.title = data.title || af.title;
+      af.desc = data.desc || '';
+      af.tags = data.tags || [];
+      af.priority = data.priority || 5;
+      af.source = data.source || '';
+      renderFileList();
+    } catch (e) {
+      showToast('⚠️ ' + af.saved_as + ': ' + e.message, 'error');
+    }
+  }
+
+  async function saveFile(idx) {
+    const af = adminFiles[idx];
+    if (af.status !== 'ok') return;
+    const saveBtn = adFileList.querySelector(`.af-save-btn[data-idx="${idx}"]`);
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '保存中…'; }
+    try {
+      const meta = {
+        name: af.saved_as, path: af.path,
+        type: getFileType(af.saved_as), sizeKB: af.size_kb,
+        desc: af.desc || '', tags: af.tags || [],
+        priority: af.priority || 5, pinned: false,
+        uploadTime: new Date().toISOString().split('T')[0],
+      };
+      const result = await apiFetch('/api.php?action=save-meta', {
+        method: 'POST', body: JSON.stringify(meta),
+      });
+      showToast('✅ ' + af.saved_as + ' 已保存——已自动刷新页面列表');
+
+      // Push to page data and re-render inline
+      if (result.data && result.data.entry) {
+        data.files.push(result.data.entry);
+        closeAdmin();
+        render();
+      } else {
+        closeAdmin();
+        render();
+      }
+    } catch (e) {
+      showToast('❌ ' + af.saved_as + ': ' + e.message, 'error');
+      if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '保存'; }
+    }
+  }
+
+  // ─── Delete existing files ──────────────────────────────────
+  function loadExistingFiles() {
+    const list = document.getElementById('adExistingList');
+    const files = data.files.filter(f => f.visible !== false).sort((a, b) => (b.priority || 5) - (a.priority || 5));
+    if (!files.length) {
+      list.innerHTML = '<div style="font-size:12px;color:var(--text-muted);padding:8px">暂无已发布文件</div>';
+      return;
+    }
+    list.innerHTML = files.map(f => {
+      const tagHtml = (f.tags || []).slice(0, 3).map(t => `<span class="ef-tag">${escapeHtml(t)}</span>`).join('');
+      const size = f.sizeKB ? (f.sizeKB >= 1024 ? (f.sizeKB/1024).toFixed(1) + ' MB' : f.sizeKB + ' KB') : '';
+      const path = f.path || '';
+      const isPinned = f.pinned;
+      return `<div class="ef-item">
+        ${isPinned ? '<span class="ef-pin-badge" title="已置顶">📌</span>' : ''}
+        <button class="ef-preview" data-path="${escapeHtml(path)}" title="预览">👁</button>
+        <span class="ef-name">${escapeHtml(f.name || path || '?')}</span>
+        <span class="ef-tags">${tagHtml}</span>
+        <span class="ef-size">${size}</span>
+        <button class="ef-pin" data-pin="${escapeHtml(f.name)}" data-state="${isPinned ? 1 : 0}">${isPinned ? '取消置顶' : '置顶'}</button>
+        <button class="ef-del" data-del="${escapeHtml(f.name)}">删除</button>
+      </div>`;
+    }).join('');
+
+    list.querySelectorAll('.ef-del').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const name = btn.dataset.del;
+        if (!confirm(`确定删除「${name}」？\n此操作会同时删除服务器文件，不可恢复。`)) return;
+        await doDelete(name);
+      });
+    });
+    list.querySelectorAll('.ef-pin').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        await doPin(btn.dataset.pin);
+        btn.disabled = false;
+      });
+    });
+    list.querySelectorAll('.ef-preview').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (btn.dataset.path) window.open(btn.dataset.path, '_blank');
+      });
+    });
+  }
+
+  async function doDelete(name) {
+    try {
+      await apiFetch('/api.php?action=delete', {
+        method: 'POST', body: JSON.stringify({ name }),
+      });
+      data.files = data.files.filter(f => f.name !== name);
+      render();
+      loadExistingFiles();
+      showToast('🗑️ ' + name + ' 已删除');
+    } catch (e) {
+      showToast('❌ 删除失败: ' + e.message, 'error');
+    }
+  }
+
+  async function doPin(name) {
+    try {
+      const result = await apiFetch('/api.php?action=pin', {
+        method: 'POST', body: JSON.stringify({ name }),
+      });
+      const entry = data.files.find(f => f.name === name);
+      if (entry) entry.pinned = result.data.pinned;
+      render();
+      loadExistingFiles();
+      showToast(result.data.pinned ? '📌 ' + name + ' 已置顶' : name + ' 已取消置顶');
+    } catch (e) {
+      showToast('❌ 操作失败: ' + e.message, 'error');
+    }
+  }
+
+  // ─── Link management ───────────────────────────────────────
+  function loadExistingLinks() {
+    const list = document.getElementById('adLinkList');
+    const links = (data.links || []).filter(l => l.visible !== false);
+    if (!links.length) {
+      list.innerHTML = '<div style="font-size:12px;color:var(--text-muted);padding:8px">暂无链接</div>';
+      return;
+    }
+    list.innerHTML = links.map(l => {
+      const isPinned = l.pinned;
+      return `<div class="el-item">
+        ${isPinned ? '<span class="el-pin-badge" title="已置顶">📌</span>' : ''}
+        <span class="el-name">${escapeHtml(l.title)}</span>
+        <button class="el-pin" data-u="${escapeHtml(l.url)}" data-s="${isPinned?1:0}">${isPinned ? '取消置顶' : '置顶'}</button>
+        <button class="el-del" data-u="${escapeHtml(l.url)}">删除</button>
+      </div>`;
+    }).join('');
+
+    list.querySelectorAll('.el-del').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('确定删除该链接？')) return;
+        await doDeleteLink(btn.dataset.u);
+      });
+    });
+    list.querySelectorAll('.el-pin').forEach(btn => {
+      btn.addEventListener('click', async () => { btn.disabled = true; await doPinLink(btn.dataset.u); btn.disabled = false; });
+    });
+  }
+
+  async function doAddLink() {
+    const title = document.getElementById('elTitle').value.trim();
+    const url = document.getElementById('elUrl').value.trim();
+    if (!title || !url) { showToast('⚠️ 标题和URL不能为空', 'error'); return; }
+    const desc = document.getElementById('elDesc').value.trim();
+    const tags = document.getElementById('elTags').value.split(',').map(t => t.trim()).filter(Boolean);
+    try {
+      const result = await apiFetch('/api.php?action=add-link', {
+        method: 'POST', body: JSON.stringify({ title, url, desc, tags }),
+      });
+      if (!data.links) data.links = [];
+      data.links.push(result.data.entry);
+      document.getElementById('elTitle').value = '';
+      document.getElementById('elUrl').value = '';
+      document.getElementById('elDesc').value = '';
+      document.getElementById('elTags').value = '';
+      render();
+      loadExistingLinks();
+      showToast('🔗 ' + title + ' 已添加');
+    } catch (e) {
+      showToast('❌ 添加失败: ' + e.message, 'error');
+    }
+  }
+
+  async function doDeleteLink(url) {
+    try {
+      await apiFetch('/api.php?action=delete-link', { method: 'POST', body: JSON.stringify({ url }) });
+      data.links = (data.links || []).filter(l => l.url !== url);
+      render();
+      loadExistingLinks();
+      showToast('🗑️ 链接已删除');
+    } catch (e) {
+      showToast('❌ 删除失败: ' + e.message, 'error');
+    }
+  }
+
+  async function doPinLink(url) {
+    try {
+      const result = await apiFetch('/api.php?action=pin-link', { method: 'POST', body: JSON.stringify({ url }) });
+      const entry = (data.links || []).find(l => l.url === url);
+      if (entry) entry.pinned = result.data.pinned;
+      render();
+      loadExistingLinks();
+      showToast(result.data.pinned ? '📌 链接已置顶' : '链接已取消置顶');
+    } catch (e) {
+      showToast('❌ 操作失败: ' + e.message, 'error');
+    }
+  }
+
+});
+
+</script>
+
+<!-- ═══ Admin Panel ═══ -->
+<div id="adminOverlay">
+  <div class="admin-card">
+    <button class="admin-close" id="adminClose">✕</button>
+
+    <!-- Step 1: Password -->
+    <div id="adStepAuth" style="display:block">
+      <h3>🔐 管理员验证</h3>
+      <p class="admin-hint">请输入管理密码以继续</p>
+      <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:500;color:var(--text-secondary);margin-bottom:8px">
+        密码
+        <input type="password" id="adPassword" placeholder="输入管理密码" style="padding:10px 14px;border:1px solid var(--border);border-radius:8px;font-size:15px;font-family:inherit;background:var(--bg);color:var(--text)">
+      </label>
+      <div id="adAuthError" style="color:#ff3b30;font-size:13px;margin-bottom:12px;min-height:18px"></div>
+      <div class="admin-actions">
+        <button class="btn-primary" id="adAuthBtn">验证</button>
+      </div>
+    </div>
+
+    <!-- Step 2: Upload -->
+    <div id="adStepUpload" style="display:none">
+      <h3>🔧 文件上传</h3>
+      <p class="admin-hint">支持多文件。上传后可逐一手动编辑或 AI 填充 · <a href="#" id="adShowStats" style="color:var(--accent)">📊 查看统计</a></p>
+      <div class="admin-dropzone" id="adminDrop">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <p>拖拽文件到此处，或点击选择</p>
+        <p class="dz-sub">支持 PDF / Word / Excel / 图片（可多选）</p>
+        <input type="file" id="adminFileInput" hidden multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp">
+      </div>
+      <div class="af-list" id="adFileList"></div>
+      <button class="af-ai-btn" id="adAIAll" style="display:none;margin-top:8px">🤖 全部 AI 填充</button>
+      <div class="ef-section" id="adExistingSection">
+        <div class="ef-title">📋 已发布文件 · 置顶 / 删除</div>
+        <div class="ef-list" id="adExistingList"></div>
+      </div>
+      <div class="ef-section" id="adLinkSection">
+        <div class="ef-title">🔗 链接管理</div>
+        <div class="el-form">
+          <input type="text" id="elTitle" placeholder="标题" maxlength="50">
+          <input type="text" id="elUrl" placeholder="URL (https://...)" maxlength="500">
+          <input type="text" id="elDesc" placeholder="描述（可选）" maxlength="200">
+          <input type="text" id="elTags" placeholder="标签，逗号分隔" maxlength="100">
+          <button class="btn-primary" id="elAddBtn" style="width:100%">➕ 添加链接</button>
+        </div>
+        <div class="ef-list" id="adLinkList"></div>
+      </div>
+    </div>
+    <!-- Stats Panel -->
+    <div id="adStepStats" style="display:none">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <span style="font-weight:600;font-size:14px">📊 数据统计</span>
+        <button class="btn-secondary" id="adStatsBack" style="font-size:12px">← 返回管理</button>
+      </div>
+      <div class="st-panel" id="stPanel">
+        <div class="st-cards" id="stCards"></div>
+        <input type="text" id="stSearch" placeholder="搜索文件名…" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;width:160px;background:var(--bg);color:var(--text);margin-bottom:12px">
+        <table class="st-table">
+          <thead><tr><th>日期</th><th>页面浏览量</th><th>文件浏览量</th></tr></thead>
+          <tbody id="stBody"></tbody>
+        </table>
+      </div>
+      <div class="st-bar-tip" id="stTip"></div>
+    </div>
+  </div>
+</div>
+<div class="admin-toast" id="adminToast"></div>
+
+<!-- ═══ Footer ═══ -->
+<div class="site-footer">
+  <span>Version 4.0 · Made by Zihuanana · Latest Update on 2026.07.24</span>
+  <br>
+  <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener" style="color:var(--text-muted);text-decoration:none;opacity:.6">京ICP备2026045588号</a>
+</div>
+
+</body>
+</html>

@@ -7,8 +7,10 @@ judge. `/api/context` is the integration boundary.
 
 ```text
 user question + student profile
+  → question-type and answer-shape planning
   → retrieval + applicability filters
   → source policy + answerability decision
+  → governed official/public web retrieval when routed
   → versioned context packet
   → LLM answer composer
   → citation and policy validator
@@ -25,7 +27,12 @@ be asked to search the database itself.
   "query": "宿舍是几人间？",
   "can_generate": true,
   "response_mode": "experience_only",
-  "model_contract_version": "campus-grounding-v1",
+  "model_contract_version": "campus-grounding-v4-governed-web",
+  "answer_plan": {
+    "question_type": "campus_experience",
+    "fallback_route": "local_knowledge",
+    "response_shape": "direct_answer_then_context_then_sources"
+  },
   "system_rules": ["..."],
   "evidence": [
     {
@@ -41,6 +48,10 @@ be asked to search the database itself.
   ]
 }
 ```
+
+Live evidence adds `source_url`, `retrieved_at`, and, when known,
+`published_at`. `official_web` may support a school claim; `public_web` may
+support contextual advice but never becomes school policy.
 
 ## Implemented provider interface
 
@@ -87,11 +98,52 @@ Before returning an answer:
 5. dates and student applicability must match the evidence;
 6. `can_generate=false` permits only a refusal plus a request for the missing
    source.
+7. a generated answer may not open as a document citation frame or policy-file
+   recital.
+8. environment-based packing advice must cite a retrieved public source.
+9. a public webpage may not be described as student experience.
+10. a certificate-wording conclusion requires cited evidence that covers both
+    the credential object and wording/appearance; certificate-award text alone
+    cannot support a claim about printed words.
 
 The current validator implements citation existence, inline citation presence,
 claim-to-evidence linkage, official-source requirements, peer-experience
 labeling, and refusal compliance. Full natural-language entailment checking is
 not yet implemented and must not be implied by the current validator.
+
+The API audits grounding through the structured `citations` list and each
+claim's `evidence_ids`; inline tokens are not required in student-facing prose.
+`display_answer` also strips tokens produced by older models or the local
+fallback. The UI renders only `sources` whose IDs were cited; other retrieval
+candidates remain available in the API for debugging but are not presented as
+answer support.
+
+## Discovery routing boundary
+
+The planner distinguishes four evidence paths:
+
+1. `local_knowledge`: answer from the indexed corpus.
+2. `official_web_discovery`: search only university, school, and verified
+   official-account sources for current school-specific facts.
+3. `public_web_discovery`: search reputable public sources for general topics,
+   while keeping them separate from school-specific claims.
+4. `official_and_public_web_discovery`: combine an official school source with
+   a distinct public context source, for example a historical arrival checklist
+   plus Lingshui climate information.
+
+All four paths can execute against sources registered in
+`config/web_sources.json`. The live adapter performs allowlisted HTML/PDF
+fetching. A provider-neutral discovery layer can additionally search beyond the
+registry; the development Tavily adapter constrains official searches to CUC domains, labels
+other results as public references, removes common personal identifiers from
+outbound queries, and degrades to registry-only retrieval without credentials.
+Official WeChat discovery remains a future adapter and must retain the same
+authority, coverage, and citation controls.
+
+For a mainland-China production deployment, keep the provider interface but
+replace the development Tavily adapter with a reviewed domestic search service.
+The durable school corpus should come from `official-sync` plus explicit
+`official-review`, not from silently persisting per-question search results.
 
 ## Conversation boundary
 
@@ -103,10 +155,12 @@ never treated as factual evidence. Sessions disappear when the process restarts.
 ## Rollout
 
 1. Collect failed questions and create human relevance labels.
-2. Replace the local subword baseline and compare retrieval ablations.
-3. Add claim-level entailment and temporal-conflict evaluation.
-4. Persist isolated sessions only when account and retention rules exist.
-5. Add structured student actions only after the factual answer path is
+2. Add an official-WeChat discovery or ingestion adapter and evaluate it against
+   the governed Tavily web-search baseline.
+3. Replace the local subword baseline and compare retrieval ablations.
+4. Add claim-level entailment and temporal-conflict evaluation.
+5. Persist isolated sessions only when account and retention rules exist.
+6. Add structured student actions only after the factual answer path is
    reliable.
 
 This order prevents fluent model output from concealing weak retrieval.

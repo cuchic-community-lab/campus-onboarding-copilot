@@ -1,7 +1,13 @@
 import unittest
 
-from campus_copilot.chat import GroundedChatService, SessionStore, contextualize_query
+from campus_copilot.chat import (
+    GroundedChatService,
+    SessionStore,
+    UNANSWERED_HANDOFF_MESSAGE,
+    contextualize_query,
+)
 from campus_copilot.composition import ExtractiveComposer
+from campus_copilot.tracing import NullTraceStore
 
 
 class FakeRetriever:
@@ -35,7 +41,201 @@ class FakeRetriever:
         }
 
 
+def web_result(source_id, authority, text):
+    return {
+        "document_id": source_id,
+        "chunk_id": "web-" + source_id,
+        "title": source_id,
+        "text": text,
+        "chunk_type": "web_excerpt",
+        "heading_path": "实时检索",
+        "page_number": None,
+        "tags": ["live_web"],
+        "authority_tier": authority,
+        "assertion_policy": "assert_with_live_citation" if authority == "official_web" else "cite_as_public_context",
+        "source_url": "https://example.test/" + source_id,
+        "cohort": None,
+        "academic_year": None,
+        "student_level": "all",
+        "major": None,
+        "campus": "Hainan",
+        "uploaded_at": None,
+        "published_at": "2022-08-09" if authority == "official_web" else None,
+        "effective_from": None,
+        "date_status": "historical_reference" if authority == "official_web" else "climate_background",
+        "uncertainty": [],
+        "retrieval_origin": "live_web",
+        "web_source_kind": "official" if authority == "official_web" else "public",
+        "fetched_at": "2026-07-30T15:00:00+0800",
+        "score": 1.0,
+        "score_explanation": {"registry_match": 1.0},
+    }
+
+
+class FakeWebRetriever:
+    name = "fake_web"
+
+    def search(self, query, routes, top_k=4):
+        results = []
+        if "official" in routes:
+            results.append(web_result("arrival-guide", "official_web", "报到时须带录取通知书、密封档案和照片。"))
+        if "public" in routes:
+            results.append(web_result("lingshui-climate", "public_web", "陵水年平均气温25℃，5至10月为雨季。"))
+        return {"executed": True, "provider": self.name, "status": "success", "routes": list(routes), "results": results, "errors": []}
+
+    def status(self):
+        return {"mode": "live", "provider": self.name}
+
+
+class CredentialWebRetriever(FakeWebRetriever):
+    def search(self, query, routes, top_k=4):
+        results = [
+            web_result(
+                "credential-faq",
+                "public_web",
+                "中外合作办学专业毕业证、学位证和其他专业一样吗？答：没有不同，与其他专业完全一致。",
+            ),
+            web_result(
+                "credential-official",
+                "official_web",
+                "中外合作办学专业达到条件后授予中国传媒大学毕业证书和学士学位。",
+            ),
+        ]
+        return {
+            "executed": True,
+            "provider": self.name,
+            "status": "success",
+            "routes": list(routes),
+            "results": results,
+            "errors": [],
+        }
+
+
+class ProgramOfferingWebRetriever(FakeWebRetriever):
+    def search(self, query, routes, top_k=4):
+        return {
+            "executed": True,
+            "provider": self.name,
+            "status": "success",
+            "routes": list(routes),
+            "results": [web_result(
+                "visual-communication-program",
+                "official_web",
+                "视觉传达设计（中外合作办学）专业介绍。",
+            )],
+            "errors": [],
+        }
+
+
+class AutonomousWebRetriever(FakeWebRetriever):
+    def search(self, query, routes, top_k=4):
+        item = web_result(
+            "discovered-school-page",
+            "official_web",
+            "学校官网搜索结果直接回答了这个新问题。",
+        )
+        item["retrieval_origin"] = "autonomous_search"
+        item["heading_path"] = "自主官网搜索"
+        return {
+            "executed": True,
+            "provider": self.name,
+            "status": "success",
+            "routes": list(routes),
+            "results": [item],
+            "errors": [],
+            "discovery": {
+                "executed": True,
+                "provider": "fake_discovery",
+                "status": "success",
+            },
+        }
+
+
 class ChatTest(unittest.TestCase):
+    def test_insufficient_evidence_bypasses_model_composer(self):
+        retriever = FakeRetriever()
+
+        def insufficient_search(query, top_k, profile):
+            result = FakeRetriever().search(query, top_k, profile)
+            result["answerability"] = "insufficient"
+            return result
+
+        retriever.search = insufficient_search
+
+        class MustNotRunComposer:
+            name = "must_not_run"
+
+            def generate(self, context):
+                raise AssertionError("model must not run without answerable evidence")
+
+        result = GroundedChatService(retriever, composer=MustNotRunComposer()).ask(
+            "智能科学与技术的就业方向有哪些？"
+        )
+        self.assertEqual(result["composer"], "extractive_fallback")
+        self.assertEqual(result["answer_plan"]["fallback_route"], "public_web_discovery")
+        self.assertEqual(result["citations"], [])
+        self.assertEqual(result["provenance"]["mode"], "search_unavailable")
+        self.assertIn("自主网页搜索尚未启用", result["provenance"]["notice"])
+        self.assertTrue(result["human_handoff"])
+        self.assertTrue(result["handoff_available"])
+        self.assertFalse(result["answer_useful"])
+        self.assertEqual(result["display_answer"], UNANSWERED_HANDOFF_MESSAGE)
+
+    def test_autonomous_web_fallback_is_explicitly_disclosed(self):
+        retriever = FakeRetriever()
+
+        def insufficient_search(query, top_k, profile):
+            result = FakeRetriever().search(query, top_k, profile)
+            result["answerability"] = "insufficient_relevance"
+            return result
+
+        retriever.search = insufficient_search
+        result = GroundedChatService(
+            retriever,
+            composer=ExtractiveComposer(),
+            web_retriever=AutonomousWebRetriever(),
+        ).ask("一个知识库里没有的新问题")
+        self.assertEqual(result["provenance"]["mode"], "autonomous_web_fallback")
+        self.assertTrue(result["provenance"]["autonomous_search_executed"])
+        self.assertTrue(result["provenance"]["autonomous_search_used"])
+        self.assertIn("知识库里没有找到", result["provenance"]["notice"])
+        self.assertIn("本轮联网搜索", result["provenance"]["notice"])
+        self.assertTrue(result["answer_useful"])
+        self.assertFalse(result["handoff_available"])
+
+    def test_handoff_form_is_hidden_when_trace_storage_is_disabled(self):
+        retriever = FakeRetriever()
+
+        def insufficient_search(query, top_k, profile):
+            result = FakeRetriever().search(query, top_k, profile)
+            result["answerability"] = "insufficient"
+            return result
+
+        retriever.search = insufficient_search
+        result = GroundedChatService(
+            retriever,
+            composer=ExtractiveComposer(),
+            trace_store=NullTraceStore(),
+        ).ask("一个无法回答的新问题")
+        self.assertEqual(result["provenance"]["mode"], "search_unavailable")
+        self.assertFalse(result["answer_useful"])
+        self.assertEqual(result["display_answer"], UNANSWERED_HANDOFF_MESSAGE)
+        self.assertFalse(result["handoff_available"])
+
+    def test_registered_snapshot_is_not_presented_as_autonomous_search(self):
+        result = GroundedChatService(
+            FakeRetriever(),
+            composer=ExtractiveComposer(),
+            web_retriever=ProgramOfferingWebRetriever(),
+        ).ask("视传只有中外合办有嘛")
+        self.assertEqual(result["provenance"]["mode"], "registered_web_fallback")
+        self.assertFalse(result["provenance"]["autonomous_search_executed"])
+        self.assertIn("不是本轮自主搜索", result["provenance"]["notice"])
+        self.assertIn("教务老师或招生办公室", result["human_handoff"])
+        self.assertFalse(result["answer_useful"])
+        self.assertEqual(result["display_answer"], UNANSWERED_HANDOFF_MESSAGE)
+        self.assertTrue(result["handoff_available"])
+
     def test_follow_up_uses_prior_user_question_for_retrieval(self):
         retriever = FakeRetriever()
         service = GroundedChatService(
@@ -50,6 +250,10 @@ class ChatTest(unittest.TestCase):
         self.assertEqual(second["conversation_turns"], 2)
         self.assertIn("宿舍是几人间", second["retrieval_query"])
         self.assertIn("那研究生呢", retriever.queries[-1])
+        self.assertNotIn("[S1]", first["display_answer"])
+        self.assertTrue(first["answer_useful"])
+        self.assertFalse(first["handoff_available"])
+        self.assertEqual([item["evidence_id"] for item in first["sources"]], ["S1"])
 
     def test_reset_removes_context(self):
         retriever = FakeRetriever()
@@ -85,6 +289,92 @@ class ChatTest(unittest.TestCase):
         self.assertEqual(result["answerability"], "insufficient_contextual_evidence")
         self.assertEqual(result["citations"], [])
         self.assertIn("问师哥师姐", result["answer"])
+
+    def test_arrival_question_replaces_irrelevant_local_passage_with_governed_web_sources(self):
+        service = GroundedChatService(
+            FakeRetriever(), composer=ExtractiveComposer(), web_retriever=FakeWebRetriever()
+        )
+        result = service.ask("开学报到要带些什么？")
+        self.assertEqual(result["answerability"], "web_supported_mixed")
+        self.assertTrue(result["answer_plan"]["web_search_executed"])
+        self.assertEqual(result["answer_plan"]["web_search_provider"], "fake_web")
+        self.assertEqual([item["authority_tier"] for item in result["evidence"]], ["official_web", "public_web"])
+        self.assertNotIn("宿舍问答", [item["title"] for item in result["evidence"]])
+        self.assertIn("录取通知书", result["answer"])
+        self.assertIn("年平均气温约25℃", result["answer"])
+        self.assertIn("不是学校强制清单", result["answer"])
+
+    def test_organization_question_uses_only_official_web_result(self):
+        service = GroundedChatService(
+            FakeRetriever(), composer=ExtractiveComposer(), web_retriever=FakeWebRetriever()
+        )
+        result = service.ask("中传的组织架构是什么？")
+        self.assertEqual(result["answerability"], "web_supported")
+        self.assertEqual([item["authority_tier"] for item in result["evidence"]], ["official_web"])
+
+    def test_credential_question_discards_campus_culture_candidate_and_uses_web(self):
+        retriever = FakeRetriever()
+
+        def wrong_local_search(query, top_k, profile):
+            result = FakeRetriever().search(query, top_k, profile)
+            result["results"][0].update({
+                "title": "中外合办校园文化问答",
+                "text": "这里有没有英国校园文化？回答：没有。",
+                "score": 99.0,
+            })
+            return result
+
+        retriever.search = wrong_local_search
+        service = GroundedChatService(
+            retriever,
+            composer=ExtractiveComposer(),
+            web_retriever=CredentialWebRetriever(),
+        )
+        result = service.ask("我们的毕业证有中外合办字样吗？")
+        self.assertTrue(result["answer_plan"]["web_search_executed"])
+        self.assertNotIn("中外合办校园文化问答", [item["title"] for item in result["evidence"]])
+        self.assertIn("没有不同", result["answer"])
+        self.assertIn("不是证书样张", result["answer"])
+        self.assertIn("授予中国传媒大学毕业证书", result["answer"])
+
+    def test_credential_question_with_only_indirect_official_source_preserves_boundary(self):
+        class OfficialOnly(CredentialWebRetriever):
+            def search(self, query, routes, top_k=4):
+                result = super().search(query, routes, top_k)
+                result["results"] = [result["results"][1]]
+                return result
+
+        service = GroundedChatService(
+            FakeRetriever(), composer=ExtractiveComposer(), web_retriever=OfficialOnly()
+        )
+        result = service.ask("我们的毕业证有中外合办字样吗？")
+        self.assertEqual(result["answerability"], "supported_with_unresolved_wording")
+        self.assertIn("不能仅凭", result["answer"])
+        self.assertIn("单独不能证明", result["answer"])
+
+    def test_visual_communication_question_rejects_unrelated_local_faq(self):
+        retriever = FakeRetriever()
+
+        def wrong_local_search(query, top_k, profile):
+            result = FakeRetriever().search(query, top_k, profile)
+            result["results"][0].update({
+                "title": "中外合办校园文化问答",
+                "text": "英国校园文化与APA7格式介绍。",
+                "score": 99.0,
+            })
+            return result
+
+        retriever.search = wrong_local_search
+        result = GroundedChatService(
+            retriever,
+            composer=ExtractiveComposer(),
+            web_retriever=ProgramOfferingWebRetriever(),
+        ).ask("视传只有中外合办有嘛")
+        titles = [item["title"] for item in result["evidence"]]
+        self.assertNotIn("中外合办校园文化问答", titles)
+        self.assertIn("视觉传达设计（中外合作办学）", result["answer"])
+        self.assertIn("不能单独证明", result["answer"])
+        self.assertNotIn("APA7", result["answer"])
 
 
 if __name__ == "__main__":

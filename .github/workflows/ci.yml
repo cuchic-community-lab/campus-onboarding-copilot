@@ -23,3 +23,9 @@ jobs:
         run: make test
       - name: Publication safety audit
         run: make publication-audit
+      - name: Validate production Compose configuration
+        run: |
+          cp deploy/.env.production.example deploy/.env.production
+          docker compose --env-file deploy/.env.production config --quiet
+      - name: Build production container image
+        run: docker build --tag hic-copilot:ci .
