@@ -1,7 +1,7 @@
 import json
 import sqlite3
 from pathlib import Path
-from typing import Iterable, List
+from typing import Dict, Iterable, List, Set
 
 from .models import ChunkRecord, DocumentRecord
 
@@ -135,3 +135,178 @@ def rebuild(path: Path, documents: List[DocumentRecord], chunks: List[ChunkRecor
         connection.commit()
     finally:
         connection.close()
+
+
+# ---------------------------------------------------------------------------
+# Incremental (checksum-diff) index maintenance
+# ---------------------------------------------------------------------------
+
+def read_checksums(path: Path) -> Dict[str, str]:
+    """Return {document_id: checksum} of the existing index, if any."""
+    if not path.exists():
+        return {}
+    connection = connect(path)
+    try:
+        return {
+            row["document_id"]: row["checksum"]
+            for row in connection.execute("SELECT document_id, checksum FROM documents")
+        }
+    finally:
+        connection.close()
+
+
+def _delete_fts_chunk(connection: sqlite3.Connection, chunk_id: str) -> None:
+    """Remove one chunk from the FTS virtual table.
+
+    chunk_id is an UNINDEXED column holding a stable id, so a standard DELETE
+    (supported by fts5) is used instead of the special 'delete' command —
+    the latter requires the full original row content and fails with
+    "SQL logic error" when only a rowid is supplied.
+    """
+    connection.execute("DELETE FROM chunk_fts WHERE chunk_id = ?", (chunk_id,))
+
+
+def _insert_document(connection: sqlite3.Connection, document: DocumentRecord) -> None:
+    connection.execute(
+        """INSERT OR REPLACE INTO documents VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        (
+            document.document_id, document.title, document.source_url, document.local_path,
+            document.media_type, document.source_kind, document.authority_tier,
+            document.assertion_policy, document.issuer, document.description,
+            json.dumps(document.tags, ensure_ascii=False), document.uploaded_at,
+            document.published_at, document.effective_from, document.effective_to,
+            document.date_status, document.cohort, document.academic_year,
+            document.student_level, document.major, document.campus, document.checksum,
+            document.parse_status, document.privacy_risk,
+        ),
+    )
+
+
+def _insert_chunk(connection: sqlite3.Connection, chunk: ChunkRecord) -> None:
+    tags = json.dumps(chunk.tags, ensure_ascii=False)
+    uncertainty = json.dumps(chunk.uncertainty, ensure_ascii=False)
+    search_terms = chinese_search_terms(" ".join([chunk.title, chunk.heading_path, chunk.text, " ".join(chunk.tags)]))
+    connection.execute(
+        """INSERT OR REPLACE INTO chunks VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        (
+            chunk.chunk_id, chunk.document_id, chunk.title, chunk.text, chunk.chunk_type,
+            chunk.sequence, chunk.heading_path, chunk.page_number, tags,
+            chunk.authority_tier, chunk.assertion_policy, chunk.source_url,
+            chunk.cohort, chunk.academic_year, chunk.student_level,
+            chunk.major, chunk.campus, uncertainty,
+            chunk.content_hash, search_terms,
+        ),
+    )
+    connection.execute(
+        "INSERT INTO chunk_fts(chunk_id, search_terms, title, heading_path, tags) VALUES (?,?,?,?,?)",
+        (chunk.chunk_id, search_terms, chunk.title, chunk.heading_path, " ".join(chunk.tags)),
+    )
+
+
+def _delete_document_rows(connection: sqlite3.Connection, document_id: str) -> None:
+    chunk_ids = [row["chunk_id"] for row in connection.execute(
+        "SELECT chunk_id FROM chunks WHERE document_id = ?", (document_id,)
+    )]
+    for chunk_id in chunk_ids:
+        _delete_fts_chunk(connection, chunk_id)
+    connection.execute("DELETE FROM chunks WHERE document_id = ?", (document_id,))
+    connection.execute("DELETE FROM documents WHERE document_id = ?", (document_id,))
+
+
+def incremental_sync(
+    path: Path,
+    documents: List[DocumentRecord],
+    chunks_by_doc: Dict[str, List[ChunkRecord]],
+    force: bool = False,
+) -> Dict[str, object]:
+    """Apply a checksum-diff sync to an existing index.
+
+    Only documents whose checksum changed (or that are new / force-rebuilt) are
+    re-parsed and re-chunked; unchanged documents are left untouched in the DB,
+    so the expensive parsing/chunking work is strictly incremental. The FTS
+    virtual table is maintained incrementally as well.
+
+    - documents:    full desired document set (new state).
+    - chunks_by_doc: only documents that need (re)chunking in this pass.
+    - force:         if True, treat every document as changed.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    existing = read_checksums(path)
+    desired = {document.document_id: document.checksum for document in documents}
+
+    added: List[DocumentRecord] = []
+    changed: List[DocumentRecord] = []
+    unchanged: List[DocumentRecord] = []
+    removed_ids: List[str] = []
+    for document in documents:
+        if document.document_id not in existing:
+            added.append(document)
+        elif force or existing[document.document_id] != document.checksum:
+            changed.append(document)
+        else:
+            unchanged.append(document)
+    for document_id in existing:
+        if document_id not in desired:
+            removed_ids.append(document_id)
+
+    connection = connect(path)
+    try:
+        connection.execute("BEGIN")
+        for document_id in removed_ids:
+            _delete_document_rows(connection, document_id)
+        for document in changed:
+            _delete_document_rows(connection, document.document_id)
+            _insert_document(connection, document)
+            for chunk in chunks_by_doc.get(document.document_id, []):
+                _insert_chunk(connection, chunk)
+        for document in added:
+            _insert_document(connection, document)
+            for chunk in chunks_by_doc.get(document.document_id, []):
+                _insert_chunk(connection, chunk)
+        connection.execute(
+            "INSERT OR REPLACE INTO index_meta(key,value) VALUES ('document_count',?)",
+            (str(len(documents)),),
+        )
+        connection.execute(
+            "INSERT OR REPLACE INTO index_meta(key,value) VALUES ('chunk_count',?)",
+            (str(_total_chunk_count(connection, chunks_by_doc, documents)),),
+        )
+        connection.execute(
+            "INSERT OR REPLACE INTO index_meta(key,value) VALUES ('schema_version','1')"
+        )
+        connection.execute(
+            "INSERT OR REPLACE INTO index_meta(key,value) VALUES ('last_sync_at', ?)",
+            (__import__("datetime").datetime.now().isoformat(timespec="seconds"),),
+        )
+        connection.commit()
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
+
+    return {
+        "added": len(added),
+        "changed": len(changed),
+        "removed": len(removed_ids),
+        "unchanged": len(unchanged),
+        "documents": len(documents),
+        "chunks": sum(len(chunks_by_doc.get(d.document_id, [])) for d in documents),
+    }
+
+
+def _total_chunk_count(
+    connection: sqlite3.Connection,
+    chunks_by_doc: Dict[str, List[ChunkRecord]],
+    documents: List[DocumentRecord],
+) -> int:
+    """chunks already in DB for untouched docs + new chunks inserted this pass."""
+    existing = 0
+    for document in documents:
+        if document.document_id in chunks_by_doc:
+            continue
+        row = connection.execute(
+            "SELECT COUNT(*) FROM chunks WHERE document_id = ?", (document.document_id,)
+        ).fetchone()
+        existing += int(row[0])
+    return existing + sum(len(chunks) for chunks in chunks_by_doc.values())

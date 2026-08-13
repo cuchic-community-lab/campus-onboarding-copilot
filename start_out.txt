@@ -1,0 +1,2 @@
+STARTED PID=37588
+HEALTH OK after 1s status=ok composer=openai_compatible

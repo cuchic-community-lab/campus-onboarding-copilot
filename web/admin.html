@@ -1,0 +1,1154 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>字画虾虾 · 双系统管理后台</title>
+<style>
+  :root {
+    --bg: #f4f6fb;
+    --card: #ffffff;
+    --card-border: #e3e8f0;
+    --text: #1f2430;
+    --text-dim: #6b7280;
+    --accent: #3b6ef6;
+    --accent-soft: rgba(59, 110, 246, .10);
+    --danger: #e5484d;
+    --danger-soft: rgba(229, 72, 77, .10);
+    --ok: #18a058;
+    --ok-soft: rgba(24, 160, 88, .12);
+    --warn: #d97706;
+    --warn-soft: rgba(217, 119, 6, .12);
+    --shadow: 0 1px 3px rgba(16, 24, 40, .06), 0 1px 2px rgba(16, 24, 40, .04);
+    --radius: 14px;
+    --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1420;
+      --card: #171e2e;
+      --card-border: #263049;
+      --text: #e6eaf3;
+      --text-dim: #8b93a7;
+      --accent: #6b96ff;
+      --accent-soft: rgba(107, 150, 255, .14);
+      --danger: #ff6b6f;
+      --danger-soft: rgba(255, 107, 111, .14);
+      --ok: #4ade80;
+      --ok-soft: rgba(74, 222, 128, .14);
+      --warn: #fbbf24;
+      --warn-soft: rgba(251, 191, 36, .14);
+      --shadow: 0 1px 3px rgba(0, 0, 0, .35);
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 20px 16px 64px; }
+
+  /* Header */
+  header {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 12px;
+    margin-bottom: 18px;
+  }
+  h1 { font-size: 22px; font-weight: 700; letter-spacing: .2px; }
+  h3 { font-size: 15px; font-weight: 600; margin: 18px 0 8px; }
+  .stats {
+    display: flex; align-items: center; gap: 10px;
+    margin-left: auto; flex-wrap: wrap;
+  }
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--card); border: 1px solid var(--card-border);
+    border-radius: 999px; padding: 5px 12px;
+    font-size: 13px; color: var(--text-dim); box-shadow: var(--shadow);
+    white-space: nowrap;
+  }
+  .pill b { color: var(--text); font-variant-numeric: tabular-nums; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); display: inline-block; }
+
+  /* Buttons */
+  .btn {
+    appearance: none; border: 1px solid var(--card-border); background: var(--card);
+    color: var(--text); border-radius: 10px; padding: 8px 14px; font-size: 14px;
+    cursor: pointer; box-shadow: var(--shadow); transition: transform .05s ease, filter .15s ease;
+    font-family: inherit;
+  }
+  .btn:hover { filter: brightness(1.05); }
+  .btn:active { transform: translateY(1px); }
+  .btn:disabled { opacity: .55; cursor: not-allowed; }
+  .btn.danger {
+    background: var(--danger-soft); border-color: transparent; color: var(--danger);
+  }
+  .btn.primary { background: var(--accent); border-color: transparent; color: #fff; }
+  .btn.sm { padding: 4px 10px; font-size: 12.5px; border-radius: 8px; }
+
+  .toolbar {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 14px;
+  }
+  .toolbar input[type="search"] {
+    flex: 1; min-width: 160px;
+    background: var(--card); border: 1px solid var(--card-border); color: var(--text);
+    border-radius: 10px; padding: 9px 12px; font-size: 14px; outline: none; box-shadow: var(--shadow);
+  }
+  .toolbar input[type="search"]:focus { border-color: var(--accent); }
+
+  /* Auth views (gate / login) */
+  .view { min-height: 60vh; display: flex; align-items: center; justify-content: center; }
+  /* 登录后必须彻底隐藏登录页：.view 的 display:flex 会覆盖 hidden 属性，这里强制 */
+  [hidden] { display: none !important; }
+  .auth-card {
+    width: min(360px, 100%);
+    background: var(--card); border: 1px solid var(--card-border); border-radius: 18px;
+    box-shadow: var(--shadow); padding: 32px 26px; text-align: center;
+  }
+  .auth-logo {
+    width: 56px; height: 56px; margin: 0 auto 14px; border-radius: 16px;
+    background: linear-gradient(135deg, #3b6ef6, #7c3aed);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 26px; box-shadow: 0 6px 20px rgba(59, 110, 246, .28);
+  }
+  .auth-card h2 { font-size: 19px; font-weight: 700; letter-spacing: .2px; }
+  .auth-hint { font-size: 13px; color: var(--text-dim); margin: 6px 0 20px; }
+  .auth-card input[type="text"],
+  .auth-card input[type="password"] {
+    width: 100%; margin-bottom: 12px;
+    background: var(--bg); border: 1px solid var(--card-border); color: var(--text);
+    border-radius: 10px; padding: 11px 14px; font-size: 15px; outline: none; font-family: inherit;
+  }
+  .auth-card input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .auth-card .btn { width: 100%; margin-top: 4px; padding: 11px; font-size: 15px; }
+  .auth-err { min-height: 20px; margin-top: 10px; font-size: 13px; color: var(--danger); }
+  .auth-back { margin-top: 14px; font-size: 12.5px; color: var(--text-dim); background: none; border: none; cursor: pointer; font-family: inherit; }
+  .auth-back:hover { color: var(--accent); }
+
+  /* Tabs */
+  .tabs {
+    display: flex; gap: 8px; margin-bottom: 16px;
+    background: var(--card); border: 1px solid var(--card-border); border-radius: 12px;
+    padding: 5px; box-shadow: var(--shadow);
+  }
+  .tab {
+    flex: 1; padding: 9px 12px; border: none; border-radius: 9px;
+    background: transparent; color: var(--text-dim); font-size: 14px; font-weight: 600;
+    cursor: pointer; font-family: inherit; transition: background .15s ease, color .15s ease;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active { background: var(--accent); color: #fff; }
+  .tab-pane[hidden] { display: none; }
+
+  /* Cards / list */
+  .card { background: var(--card); border: 1px solid var(--card-border); border-radius: var(--radius); box-shadow: var(--shadow); }
+  .log-list { display: flex; flex-direction: column; gap: 8px; }
+  .log-item {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;
+    width: 100%; text-align: left;
+    background: var(--card); border: 1px solid var(--card-border); border-radius: 12px;
+    padding: 12px 14px; cursor: pointer; font: inherit; color: var(--text);
+    box-shadow: var(--shadow); transition: border-color .15s ease, transform .05s ease;
+  }
+  .log-item:hover { border-color: var(--accent); }
+  .log-item:active { transform: scale(.995); }
+  .log-item .sid {
+    font-family: var(--mono); font-size: 12.5px; font-weight: 600;
+    word-break: break-all; min-width: 0;
+  }
+  .log-item .meta { margin-left: auto; display: flex; gap: 10px; font-size: 12px; color: var(--text-dim); white-space: nowrap; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11.5px; background: var(--accent-soft); color: var(--accent); }
+  .badge.ok { background: var(--ok-soft); color: var(--ok); }
+  .badge.warn { background: var(--warn-soft); color: var(--warn); }
+  .badge.danger { background: var(--danger-soft); color: var(--danger); }
+
+  .empty, .err { padding: 28px 16px; text-align: center; color: var(--text-dim); font-size: 14px; }
+  .err { color: var(--danger); }
+
+  /* Detail view */
+  .detail { margin-top: 14px; overflow: hidden; }
+  .detail-head {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+    padding: 12px 14px; border-bottom: 1px solid var(--card-border);
+  }
+  .detail-head .title { font-weight: 600; font-size: 14px; word-break: break-all; }
+  .detail-head .close { margin-left: auto; }
+  .detail-body { padding: 8px 0; max-height: 62vh; overflow-y: auto; }
+  .dl-row { padding: 8px 16px; }
+  .dl-row.user { background: var(--accent-soft); }
+  .dl-row.ai { background: transparent; }
+  .dl-tag { font-size: 11px; font-family: var(--mono); color: var(--text-dim); margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
+  .dl-tag .role { font-weight: 700; }
+  .dl-tag .role.user { color: var(--accent); }
+  .dl-tag .role.ai { color: var(--ok); }
+  .dl-text { white-space: pre-wrap; word-break: break-word; font-size: 14px; }
+
+  /* index 后台：统计卡 */
+  .idx-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 6px; }
+  .idx-card {
+    background: var(--card); border: 1px solid var(--card-border); border-radius: 12px;
+    padding: 14px 16px; box-shadow: var(--shadow);
+  }
+  .idx-card .num { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.5px; }
+  .idx-card .lbl { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+  .idx-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .idx-table th, .idx-table td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--card-border); }
+  .idx-table th { color: var(--text-dim); font-weight: 600; font-size: 12px; white-space: nowrap; }
+  .idx-table td.num, .idx-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .idx-note {
+    margin-bottom: 14px; padding: 10px 14px; border-radius: 10px;
+    background: var(--warn-soft); color: var(--warn); font-size: 13px;
+  }
+
+  /* 表单行（上传 / 链接） */
+  .idx-form {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+    padding: 12px 14px; border-bottom: 1px solid var(--card-border);
+  }
+  .idx-form input[type="text"], .idx-form input[type="file"] {
+    flex: 1; min-width: 140px;
+    background: var(--bg); border: 1px solid var(--card-border); color: var(--text);
+    border-radius: 10px; padding: 9px 12px; font-size: 13px; outline: none; font-family: inherit;
+  }
+  .idx-form input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .idx-form-hint { font-size: 12px; color: var(--text-dim); width: 100%; }
+
+  /* 师哥师姐答题 */
+  .senior-card { display: flex; flex-direction: column; align-items: stretch; gap: 8px; width: 100%; }
+  .senior-q { font-size: 14px; white-space: pre-wrap; word-break: break-word; }
+  .senior-reply { display: flex; gap: 8px; align-items: flex-end; }
+  .senior-reply textarea {
+    flex: 1; min-height: 56px; padding: 8px 10px;
+    border: 1px solid var(--card-border); border-radius: 10px;
+    background: var(--bg); color: var(--text); font-family: inherit; font-size: 13px; outline: none; resize: vertical;
+  }
+  .senior-reply textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+
+  .loading { text-align: center; color: var(--text-dim); padding: 24px; font-size: 13px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinner {
+    display: inline-block; width: 14px; height: 14px; margin-right: 6px;
+    border: 2px solid var(--card-border); border-top-color: var(--accent); border-radius: 50%;
+    vertical-align: -2px; animation: spin .8s linear infinite;
+  }
+
+  footer { margin-top: 26px; text-align: center; font-size: 12px; color: var(--text-dim); }
+  @media (max-width: 520px) {
+    h1 { font-size: 19px; }
+    .stats { margin-left: 0; width: 100%; justify-content: space-between; }
+    .log-item .meta { margin-left: 0; width: 100%; justify-content: space-between; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ─── 视图 1：登录（门禁已移除，直接密码登录） ─── -->
+  <div class="view" id="viewLogin">
+    <div class="auth-card">
+      <div class="auth-logo">🦐</div>
+      <h2>管理员登录</h2>
+      <p class="auth-hint">输入密码即可登录（统一密码）</p>
+      <input type="password" id="loginPass" placeholder="密码" autocomplete="current-password" enterkeyhint="go" autofocus>
+      <button class="btn primary" id="loginBtn">登录</button>
+      <div class="auth-err" id="loginErr"></div>
+    </div>
+  </div>
+
+  <!-- ─── 视图 3：主界面（双系统） ─── -->
+  <div id="viewMain" hidden>
+    <header>
+      <h1>双系统管理后台</h1>
+      <div class="stats">
+        <span class="pill"><span class="dot"></span>服务在线</span>
+        <span class="pill" id="sessPill">会话 <b id="sessCount">–</b></span>
+        <button class="btn" id="refreshBtn" title="刷新">刷新</button>
+        <button class="btn" id="logoutBtn" title="退出登录">退出</button>
+      </div>
+    </header>
+
+    <!-- Tab 切换 -->
+    <nav class="tabs" id="tabs">
+      <button class="tab active" data-tab="xg">XiaohaiGPT 后台</button>
+      <button class="tab" data-tab="idx">index 后台</button>
+    </nav>
+
+    <!-- ─── Tab A：XiaohaiGPT 后台（会话日志 + 师哥师姐答题） ─── -->
+    <section class="tab-pane" id="tab-xg">
+      <h3>师哥师姐答题 · 待答</h3>
+      <div class="card">
+        <div id="seniorList" class="log-list" style="padding:10px;"></div>
+      </div>
+
+      <h3>会话日志</h3>
+      <div class="toolbar">
+        <button class="btn primary" id="clearBtn">清空会话</button>
+        <input type="search" id="filterInput" placeholder="按 session_id 筛选…" autocomplete="off">
+      </div>
+      <div class="card">
+        <div id="listWrap" class="log-list" style="padding:10px;"></div>
+      </div>
+      <div class="card detail" id="detailBox" hidden>
+        <div class="detail-head">
+          <span class="title" id="detailTitle"></span>
+          <button class="btn close" id="detailClose">收起</button>
+        </div>
+        <div class="detail-body" id="detailBody"></div>
+      </div>
+    </section>
+
+    <!-- ─── Tab B：index 后台（api.php 管理端点） ─── -->
+    <section class="tab-pane" id="tab-idx" hidden>
+      <div class="idx-note" id="idxNote" hidden></div>
+
+      <div class="idx-cards" id="idxCards">
+        <div class="idx-card"><div class="lbl">加载中…</div></div>
+      </div>
+
+      <h3>近 7 日访问趋势</h3>
+      <div class="card" style="overflow-x:auto;">
+        <table class="idx-table" id="idxTrend"><tbody></tbody></table>
+      </div>
+
+      <h3>文件管理</h3>
+      <div class="card">
+        <div class="idx-form" id="uploadRow">
+          <input type="file" id="uploadInput" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp">
+          <button class="btn primary sm" id="uploadBtn">上传</button>
+          <span class="idx-form-hint" id="uploadHint">上传后自动保存元信息（AI/规则自动填充标题、描述、标签）</span>
+        </div>
+        <div id="fileList" class="log-list" style="padding:10px;"></div>
+      </div>
+
+      <h3>链接管理</h3>
+      <div class="card">
+        <div class="idx-form" id="linkForm">
+          <input type="text" id="linkTitle" placeholder="标题" maxlength="50" autocomplete="off">
+          <input type="text" id="linkUrl" placeholder="URL (https://...)" maxlength="500" autocomplete="off">
+          <input type="text" id="linkDesc" placeholder="备注（可选）" maxlength="100" autocomplete="off">
+          <input type="text" id="linkTags" placeholder="标签（逗号分隔，可选）" maxlength="100" autocomplete="off">
+          <button class="btn primary sm" id="linkAddBtn">添加链接</button>
+        </div>
+        <div id="linkList" class="log-list" style="padding:10px;"></div>
+      </div>
+
+      <h3>文件浏览量明细</h3>
+      <div class="card" style="overflow-x:auto;">
+        <table class="idx-table" id="viewsTable"><tbody></tbody></table>
+      </div>
+
+      <h3>待审核二维码</h3>
+      <div class="card">
+        <div id="qrList" class="log-list" style="padding:10px;"></div>
+      </div>
+
+      <h3>QA 内容预览</h3>
+      <div class="card">
+        <div id="qaContent" class="log-list" style="padding:10px;"></div>
+      </div>
+    </section>
+  </div>
+
+  <footer>XiaohaiGPT 日志只读 · 清空仅作用于内存会话，不影响 data/logs 持久化 · index 后台管理端点走 api.php（X-Admin-Token，登录密码即统一密码）</footer>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ═══════════════════════════════════════════
+     0. 常量与工具
+     ═══════════════════════════════════════════ */
+  var ADMIN_USER = 'admin';            // 登录用户名（前端硬校验；密码走后端验证）
+  var API = (function () {
+    var p = location.pathname;
+    if (p.indexOf('/copilot/') === 0) return '/copilot';        // 宝塔反代
+    if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') return ''; // 本地服务同源
+    return '/copilot';                                          // 线上同源反代
+  })();
+  var $ = function (id) { return document.getElementById(id); };
+  var esc = function (s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
+    });
+  };
+  var shortId = function (id) { return id.length > 16 ? id.slice(0, 8) + '…' + id.slice(-6) : id; };
+  var adminPass = '';         // 登录密码（内存变量，统一密码）
+  var indexToken = '';        // api.php 的 X-Admin-Token
+  var phpReachable = false;   // api.php 是否可达（本地无 PHP 时为 false，展示降级提示）
+  var logsCache = [];
+
+  function showView(id) {
+    ['viewLogin', 'viewMain'].forEach(function (v) { $(v).hidden = (v !== id); });
+  }
+
+  /* ═══════════════════════════════════════════
+     1. 登录：密码 → 后端验证（多通道回退）
+     链路：① api.php /auth（index 后台 token，优先）
+           ② copilot /api/admin/auth（若后端已提供）
+           ③ copilot /api/senior/pending?token=（探活兜底）
+     登录成功即保存 adminPass，作为全后台统一密码。
+     ═══════════════════════════════════════════ */
+  function apiJson(url, opts) {
+    opts = opts || {};
+    return fetch(url, opts).then(function (res) {
+      return res.json().catch(function () { return {}; }).then(function (body) {
+        return { ok: res.ok, status: res.status, body: body };
+      });
+    });
+  }
+
+  /* 通道①：api.php auth → 拿 index 后台 token
+     判定：200+token 成功；403 真实 api.php 密码错误（可达）；
+           其余 400/404/网络 一律视为 api.php 不可达（如本地 8000 copilot 会拦 /api.php 返回 400） */
+  function tryApiPhpAuth(pass) {
+    return apiJson('/api.php?action=auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pass })
+    }).then(function (r) {
+      if (r.ok && r.body && r.body.token) { phpReachable = true; indexToken = r.body.token; return true; }
+      if (r.status === 403) { phpReachable = true; return false; }
+      phpReachable = false;
+      return false;
+    }).catch(function () { phpReachable = false; return false; });
+  }
+
+  /* 通道②：copilot 管理登录（若 包包 已加 /api/admin/auth） */
+  function tryAdminAuth(user, pass) {
+    return apiJson(API + '/api/admin/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: user, password: pass })
+    }).then(function (r) { return r.ok; })
+      .catch(function () { return false; });
+  }
+
+  /* 通道③：copilot senior 探活（密码即 SENIOR_ADMIN_TOKEN） */
+  function trySeniorToken(pass) {
+    return apiJson(API + '/api/senior/pending?token=' + encodeURIComponent(pass))
+      .then(function (r) { return r.ok; })
+      .catch(function () { return false; });
+  }
+
+  function doLogin() {
+    var pass = $('loginPass').value;
+    if (!pass) { $('loginErr').textContent = '请输入密码'; return; }
+    var btn = $('loginBtn');
+    btn.disabled = true; btn.textContent = '验证中…';
+    $('loginErr').textContent = '';
+
+    /* 依次尝试：① api.php 最优先（index 后台必需 token）
+       其次 ② copilot admin/auth，最后 ③ senior 探活 */
+    tryApiPhpAuth(pass).then(function (phpOk) {
+      return phpOk ? true : tryAdminAuth(ADMIN_USER, pass).then(function (copOk) {
+        return copOk ? true : trySeniorToken(pass);
+      });
+    }).then(function (loggedIn) {
+      if (loggedIn) {
+        adminPass = pass;
+        enterMain();
+      }
+      else { $('loginErr').textContent = '登录失败：密码错误'; }
+    }).catch(function () {
+      $('loginErr').textContent = '登录失败：后端验证不可用';
+    }).then(function () {
+      btn.disabled = false; btn.textContent = '登录';
+    });
+  }
+  $('loginBtn').addEventListener('click', doLogin);
+  $('loginPass').addEventListener('keydown', function (e) { if (e.key === 'Enter') doLogin(); });
+
+  function enterMain() {
+    showView('viewMain');          // 登录页彻底隐藏，直接进入双 Tab
+    $('idxNote').hidden = true;
+    switchTab('xg');
+    loadStats(); loadLogs();
+    autoIdxAuth();                 // 用统一密码自动获取 index token（后台完成，不阻塞）
+  }
+
+  $('logoutBtn').addEventListener('click', function () {
+    if (!confirm('确定退出登录？')) return;
+    adminPass = '';
+    indexToken = '';
+    phpReachable = false;
+    showView('viewLogin');
+    $('loginPass').value = '';
+    $('loginErr').textContent = '';
+    $('loginPass').focus();
+  });
+
+  /* ═══════════════════════════════════════════
+     3. Tab 切换
+     ═══════════════════════════════════════════ */
+  function switchTab(name) {
+    $('tab-xg').hidden = (name !== 'xg');
+    $('tab-idx').hidden = (name !== 'idx');
+    document.querySelectorAll('.tab').forEach(function (t) {
+      t.classList.toggle('active', t.dataset.tab === name);
+    });
+    if (name === 'idx') loadIdxAll();
+    if (name === 'xg') loadSeniorPending();
+  }
+  document.querySelectorAll('.tab').forEach(function (t) {
+    t.addEventListener('click', function () { switchTab(t.dataset.tab); });
+  });
+
+  /* ═══════════════════════════════════════════
+     4. XiaohaiGPT 后台（会话日志 + 师哥师姐答题）
+     ═══════════════════════════════════════════ */
+  function api(path, opts) {
+    opts = opts || {};
+    return fetch(API + path, opts).then(function (res) {
+      return res.json().catch(function () { return {}; }).then(function (body) {
+        if (!res.ok) throw new Error(body.error || body.detail || ('HTTP ' + res.status));
+        return body;
+      });
+    });
+  }
+
+  function loadStats() {
+    api('/api/sessions/stats').then(function (s) {
+      $('sessCount').textContent = (s.count ?? 0) + ' / ' + (s.max_sessions ?? '–');
+    }).catch(function () {
+      $('sessCount').textContent = 'err';
+    });
+  }
+
+  function loadLogs() {
+    var wrap = $('listWrap');
+    wrap.innerHTML = '<div class="loading"><span class="spinner"></span>加载日志列表…</div>';
+    api('/api/logs').then(function (data) {
+      logsCache = data.files || [];
+      renderLogs(logsCache);
+    }).catch(function (e) {
+      wrap.innerHTML = '<div class="err">日志加载失败：' + esc(e.message) + '</div>';
+    });
+  }
+
+  function renderLogs(list) {
+    var wrap = $('listWrap');
+    var kw = $('filterInput').value.trim().toLowerCase();
+    var filtered = kw ? list.filter(function (f) { return f.session_id.toLowerCase().indexOf(kw) !== -1; }) : list;
+    if (!filtered.length) {
+      wrap.innerHTML = '<div class="empty">' + (kw ? '无匹配会话' : '暂无日志') + '</div>';
+      return;
+    }
+    wrap.innerHTML = '';
+    filtered.forEach(function (f) {
+      var btn = document.createElement('button');
+      btn.className = 'log-item';
+      btn.innerHTML =
+        '<span class="sid">' + esc(shortId(f.session_id)) + '</span>' +
+        '<span class="badge">' + (f.lines ?? 0) + ' 行</span>' +
+        '<span class="meta"><span>' + esc(f.created_at || '') + '</span></span>';
+      btn.addEventListener('click', function () { openDetail(f); });
+      wrap.appendChild(btn);
+    });
+  }
+
+  function openDetail(f) {
+    var box = $('detailBox');
+    $('detailTitle').textContent = f.session_id;
+    $('detailBody').innerHTML = '<div class="loading"><span class="spinner"></span>加载中…</div>';
+    box.hidden = false;
+    box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    api('/api/logs?file=' + encodeURIComponent(f.session_id)).then(function (d) {
+      $('detailBody').innerHTML = renderDialog(d.content);
+    }).catch(function (e) {
+      $('detailBody').innerHTML = '<div class="err">内容加载失败：' + esc(e.message) + '</div>';
+    });
+  }
+
+  function renderDialog(content) {
+    var lines = (content || '').split('\n');
+    var html = '', curRole = null, curTime = '', buf = [];
+    function flush() {
+      if (!curRole) return;
+      var text = buf.join('\n').trim();
+      if (text) {
+        var roleCls = curRole === 'user' ? 'user' : 'ai';
+        var roleName = curRole === 'user' ? '用户' : 'AI';
+        html += '<div class="dl-row ' + roleCls + '"><div class="dl-tag">' +
+          '<span class="role ' + roleCls + '">' + roleName + '</span>' +
+          '<span>' + esc(curTime) + '</span></div>' +
+          '<div class="dl-text">' + esc(text) + '</div></div>';
+      }
+      buf = [];
+    }
+    lines.forEach(function (raw) {
+      var line = raw.trimEnd();
+      if (line.indexOf('## ') === 0) {
+        flush();
+        var m = line.match(/^##\s*(.*?)\s*\|\s*(user|ai)\s*$/i);
+        if (m) { curTime = m[1]; curRole = m[2].toLowerCase(); }
+        else { curRole = null; }
+      } else if (line.indexOf('<!--') === 0) {
+        // 注释行跳过
+      } else {
+        buf.push(line);
+      }
+    });
+    flush();
+    return html || '<div class="empty">（空日志）</div>';
+  }
+
+  function clearSessions() {
+    var n = $('sessCount').textContent;
+    if (!confirm('确定清空全部会话吗？\n当前内存会话数：' + n + '\n\n仅清空内存会话，data/logs 持久化日志不受影响。')) return;
+    $('clearBtn').disabled = true;
+    $('clearBtn').textContent = '清空中…';
+    api('/api/session/clear', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}'
+    }).then(function (r) {
+      alert('已清空：' + (r.cleared || 'all'));
+      return Promise.all([loadStats(), loadLogs()]);
+    }).catch(function (e) {
+      alert('清空失败：' + e.message);
+    }).then(function () {
+      $('clearBtn').disabled = false;
+      $('clearBtn').textContent = '清空会话';
+    });
+  }
+
+  $('clearBtn').addEventListener('click', clearSessions);
+  $('refreshBtn').addEventListener('click', function () {
+    autoIdxAuth().then(function () { loadStats(); loadLogs(); loadIdxAll(); });
+  });
+  $('detailClose').addEventListener('click', function () { $('detailBox').hidden = true; });
+  $('filterInput').addEventListener('input', function () { renderLogs(logsCache); });
+
+  /* ── 师哥师姐答题（管理员回复，token = 登录统一密码） ── */
+  function loadSeniorPending() {
+    var wrap = $('seniorList');
+    if (!adminPass) {
+      wrap.innerHTML = '<div class="empty">登录密码缺失，无法加载待答问题（请重新登录）</div>';
+      return;
+    }
+    wrap.innerHTML = '<div class="loading"><span class="spinner"></span>加载待答问题…</div>';
+    api('/api/senior/pending?token=' + encodeURIComponent(adminPass)).then(function (data) {
+      var list = data.pending || [];
+      if (!list.length) { wrap.innerHTML = '<div class="empty">暂无待答问题 🎉</div>'; return; }
+      wrap.innerHTML = '';
+      list.forEach(function (q) {
+        var item = document.createElement('div');
+        item.className = 'log-item';
+        item.style.cursor = 'default';
+        item.innerHTML =
+          '<div class="senior-card">' +
+            '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;">' +
+              '<span class="badge warn">待答</span>' +
+              '<span class="sid" style="font-size:12px;">' + esc(q.question_id) + '</span>' +
+              '<span class="meta"><span>' + esc(q.nickname || '匿名') + '</span><span>' + esc(q.created_at || '') + '</span></span>' +
+            '</div>' +
+            '<div class="senior-q">' + esc(q.question) + '</div>' +
+            '<div class="senior-reply">' +
+              '<textarea data-sqid="' + esc(q.question_id) + '" placeholder="输入回复内容…" maxlength="2000"></textarea>' +
+              '<button class="btn primary sm" data-reply="' + esc(q.question_id) + '">回复</button>' +
+            '</div>' +
+          '</div>';
+        item.querySelector('[data-reply]').addEventListener('click', function () {
+          var ta = item.querySelector('textarea[data-sqid="' + q.question_id + '"]');
+          doSeniorReply(q, ta);
+        });
+        wrap.appendChild(item);
+      });
+    }).catch(function (e) {
+      wrap.innerHTML = '<div class="err">待答问题加载失败：' + esc(e.message) + '</div>';
+    });
+  }
+
+  function doSeniorReply(q, ta) {
+    var text = (ta.value || '').trim();
+    if (!text) { alert('请输入回复内容'); return; }
+    ta.disabled = true;
+    api('/api/senior/reply', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: adminPass, question_id: q.question_id, text: text, author: '师哥师姐' })
+    }).then(function () {
+      alert('已回复：' + q.question_id);
+      loadSeniorPending();   // 回复后刷新列表（该问题移出待答）
+    }).catch(function (e) {
+      ta.disabled = false;
+      alert('回复失败：' + e.message);
+    });
+  }
+
+  /* ═══════════════════════════════════════════
+     5. index 后台（api.php 管理端点）
+     ═══════════════════════════════════════════ */
+  function idxApi(action, opts) {
+    opts = opts || {};
+    var headers = Object.assign({}, opts.headers || {});
+    if (indexToken) headers['X-Admin-Token'] = indexToken;
+    return fetch('/api.php?action=' + encodeURIComponent(action), Object.assign({}, opts, { headers: headers }))
+      .then(function (res) {
+        return res.json().catch(function () { return {}; }).then(function (body) {
+          if (res.status === 404 || res.status === 400) { phpReachable = false; throw new Error('api.php 不可达（本地未配置 PHP）'); }
+          phpReachable = true;
+          if (res.status === 401) {
+            indexToken = '';
+            throw new Error('未授权：index token 已失效，请点刷新重试');
+          }
+          if (!res.ok || body.error) throw new Error(body.error || ('HTTP ' + res.status));
+          return body;
+        });
+      });
+  }
+
+  /* 统一密码自动授权：用登录密码换取 index token（不再弹第二密码框） */
+  function autoIdxAuth() {
+    return new Promise(function (resolve) {
+      if (indexToken && phpReachable) { resolve(true); return; }
+      if (!adminPass) { resolve(false); return; }
+      apiJson('/api.php?action=auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: adminPass })
+      }).then(function (r) {
+        if (r.ok && r.body && r.body.token) {
+          phpReachable = true;
+          indexToken = r.body.token;
+          resolve(true);
+          return;
+        }
+        if (r.status === 403) { phpReachable = true; resolve(false); return; }
+        phpReachable = false;
+        resolve(false);
+      }).catch(function () {
+        phpReachable = false;
+        resolve(false);
+      });
+    });
+  }
+
+  /* 降级提示（api.php 不可达 / 密码不一致），不弹第二个密码框 */
+  function showIdxDegrade() {
+    var note = $('idxNote');
+    if (!phpReachable) {
+      note.textContent = 'index 后端（api.php）当前不可达（本地未配置 PHP 或未部署），stats / 二维码审核 / 上传管理需在服务器环境使用。';
+    } else {
+      note.innerHTML = 'index 后台未授权：api.php 密码与登录密码不一致，文件列表只读，管理操作不可用。' +
+        ' <button class="btn sm" id="idxRetryBtn" style="vertical-align:middle;margin-left:4px;">重试</button>';
+    }
+    note.hidden = false;
+    var rb = $('idxRetryBtn');
+    if (rb) rb.addEventListener('click', function () {
+      autoIdxAuth().then(function (ok) {
+        if (ok) loadIdxAll();
+        else showIdxDegrade();
+      });
+    });
+  }
+
+  function loadIdxAll() {
+    if (!$('tab-idx') || $('tab-idx').hidden) return;
+    // 公开数据始终加载
+    loadFileList();
+    loadLinkList();
+    loadViews();
+    loadQA();
+    // 用统一密码自动授权，成功后加载鉴权数据
+    autoIdxAuth().then(function (ok) {
+      if (!ok) {
+        showIdxDegrade();
+        $('idxCards').innerHTML = '<div class="empty">index 后端未授权（统计不可用）</div>';
+        $('idxTrend').querySelector('tbody').innerHTML = '';
+        $('qrList').innerHTML = '<div class="empty">—</div>';
+        $('uploadRow').style.display = 'none';
+        $('linkForm').style.display = 'none';
+        return;
+      }
+      $('uploadRow').style.display = '';
+      $('linkForm').style.display = '';
+      $('idxNote').hidden = true;
+      loadIdxStats();
+      loadPendingQrcodes();
+    });
+  }
+
+  function loadIdxStats() {
+    $('idxCards').innerHTML = '<div class="idx-card"><div class="lbl">加载中…</div></div>';
+    idxApi('stats').then(function (s) {
+      var pv = s.total_pv || 0, fv = s.total_fv || 0;
+      var daily = s.daily || [];
+      var last = daily.length ? daily[daily.length - 1] : null;
+      var top = [];
+      (daily || []).forEach(function (d) {
+        (d.files || []).forEach(function (f) { top.push({ name: f.name, count: f.count }); });
+      });
+      top.sort(function (a, b) { return b.count - a.count; });
+      top = top.slice(0, 8);
+      $('idxCards').innerHTML =
+        '<div class="idx-card"><div class="num">' + pv + '</div><div class="lbl">累计页面访问 PV</div></div>' +
+        '<div class="idx-card"><div class="num">' + fv + '</div><div class="lbl">累计文件下载 FV</div></div>' +
+        '<div class="idx-card"><div class="num">' + (last ? last.pages : 0) + '</div><div class="lbl">最近一日 PV</div></div>' +
+        '<div class="idx-card"><div class="num">' + daily.length + '</div><div class="lbl">有记录天数</div></div>';
+      var tbody = $('idxTrend').querySelector('tbody');
+      var rows = daily.slice(-7).map(function (d) {
+        var fsum = (d.files || []).slice(0, 3).map(function (f) { return f.name; }).join('、');
+        return '<tr><td>' + esc(d.date) + '</td>' +
+          '<td class="num">' + d.pages + '</td>' +
+          '<td class="num">' + d.ftotal + '</td>' +
+          '<td>' + esc(fsum || '—') + '</td></tr>';
+      }).join('');
+      tbody.innerHTML = rows;
+    }).catch(function (e) {
+      $('idxCards').innerHTML = '<div class="empty">' + esc(e.message) + '</div>';
+      $('idxTrend').querySelector('tbody').innerHTML = '';
+    });
+  }
+
+  /* ── 文件管理：上传 / 列表 / 置顶 / 删除 / 预览 ── */
+  function getFileType(name) {
+    var ext = String(name || '').split('.').pop().toLowerCase();
+    var map = { pdf: 'pdf', doc: 'word', docx: 'word', xls: 'excel', xlsx: 'excel',
+                jpg: 'image', jpeg: 'image', png: 'image', gif: 'image', webp: 'image' };
+    return map[ext] || 'other';
+  }
+
+  function doUpload() {
+    var input = $('uploadInput');
+    var files = Array.prototype.slice.call(input.files || []);
+    if (!files.length) { $('uploadHint').textContent = '请先选择文件'; return; }
+    var btn = $('uploadBtn');
+    btn.disabled = true;
+    $('uploadHint').textContent = '上传中…';
+    var ok = 0, errors = [];
+    var chain = Promise.resolve();
+    files.forEach(function (file) {
+      chain = chain.then(function () {
+        if (file.size > 50 * 1024 * 1024) { errors.push(file.name + ' 超过 50MB，跳过'); return; }
+        var fd = new FormData();
+        fd.append('file', file);
+        return idxApi('upload', { method: 'POST', body: fd }).then(function (u) {
+          ok++;
+          // 上传成功后自动写入元信息（save-meta，suggest 由 api.php 自动生成）
+          if (u.suggest) {
+            var meta = {
+              name: u.saved_as,
+              path: u.path,
+              type: getFileType(u.saved_as),
+              sizeKB: u.size_kb,
+              desc: u.suggest.desc || '',
+              tags: u.suggest.tags || [],
+              priority: u.suggest.priority || 5,
+              pinned: false,
+              uploadTime: new Date().toISOString().split('T')[0]
+            };
+            return idxApi('save-meta', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(meta)
+            }).then(function () { }, function (e) {
+              errors.push(u.saved_as + ' 元信息保存失败（文件已上传）：' + e.message);
+            });
+          }
+        }).catch(function (e) {
+          errors.push(file.name + ' 上传失败：' + e.message);
+        });
+      });
+    });
+    chain.then(function () {
+      btn.disabled = false;
+      input.value = '';
+      $('uploadHint').textContent = '完成：成功 ' + ok + ' 个' + (errors.length ? '，失败 ' + errors.length + ' 个' : '') + '，列表已刷新';
+      if (errors.length) alert(errors.join('\n'));
+      loadFileList();
+    });
+  }
+
+  function loadFileList() {
+    var wrap = $('fileList');
+    wrap.innerHTML = '<div class="loading"><span class="spinner"></span>加载文件库…</div>';
+    Promise.all([
+      fetch('/files.json?t=' + Date.now()).then(function (res) {
+        if (!res.ok) throw new Error('files.json HTTP ' + res.status);
+        return res.json();
+      }),
+      idxApi('views').then(function (v) { return v || {}; }, function () { return {}; })
+    ]).then(function (results) {
+      var data = results[0], views = results[1] || {};
+      var files = data.files || [];
+      if (!files.length) { wrap.innerHTML = '<div class="empty">暂无文件</div>'; return; }
+      files.sort(function (a, b) {
+        var p = (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0);
+        if (p) return p;
+        return (b.priority || 5) - (a.priority || 5);
+      });
+      wrap.innerHTML = '';
+      files.forEach(function (f) {
+        var tags = (f.tags || []).slice(0, 3).map(function (t) { return '<span class="badge">' + esc(t) + '</span>'; }).join('');
+        var size = f.sizeKB ? (f.sizeKB >= 1024 ? (f.sizeKB / 1024).toFixed(1) + ' MB' : f.sizeKB + ' KB') : '';
+        var vc = views[f.name] || 0;
+        var item = document.createElement('div');
+        item.className = 'log-item';
+        item.style.cursor = 'default';
+        item.innerHTML =
+          '<span class="sid" style="font-size:13px;">' + esc(f.name) + '</span>' +
+          (f.pinned ? '<span class="badge ok">置顶</span>' : '') +
+          '<span class="badge">' + esc((f.type || 'other').toUpperCase()) + '</span>' +
+          (size ? '<span class="badge">' + esc(size) + '</span>' : '') +
+          tags +
+          '<span class="meta">' +
+            '<span>👁 ' + vc + '</span>' +
+            '<span>' + esc(f.uploadTime || '') + '</span>' +
+          '</span>' +
+          '<span class="meta" style="margin-left:0;">' +
+          (indexToken && phpReachable
+            ? (f.path ? '<button class="btn sm" data-prev="' + esc(f.path) + '">预览</button>' : '') +
+              '<button class="btn sm" data-pin="' + esc(f.name) + '">' + (f.pinned ? '取消置顶' : '置顶') + '</button>' +
+              '<button class="btn sm danger" data-del="' + esc(f.name) + '">删除</button>'
+            : '<span>需 index 授权</span>') +
+          '</span>';
+        item.addEventListener('click', function (e) {
+          var prev = e.target.closest('[data-prev]');
+          var pin = e.target.closest('[data-pin]');
+          var del = e.target.closest('[data-del]');
+          if (prev) { window.open(prev.dataset.prev, '_blank'); return; }
+          if (pin) { doPin(pin.dataset.pin, pin); return; }
+          if (del) {
+            if (!confirm('确定删除文件？\n' + del.dataset.del + '\n\n仅从 files.json 移除，磁盘文件一并删除。')) return;
+            doDelete(del.dataset.del, del);
+          }
+        });
+        wrap.appendChild(item);
+      });
+    }).catch(function (e) {
+      wrap.innerHTML = '<div class="err">文件库加载失败：' + esc(e.message) + '</div>';
+    });
+  }
+
+  function doDelete(name, btn) {
+    btn.disabled = true;
+    idxApi('delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name })
+    }).then(function () {
+      alert('已删除：' + name);
+      loadFileList();
+    }).catch(function (err) {
+      btn.disabled = false;
+      alert('删除失败：' + err.message);
+    });
+  }
+
+  function doPin(name, btn) {
+    btn.disabled = true;
+    idxApi('pin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name })
+    }).then(function (r) {
+      alert(r.pinned ? '已置顶：' + name : '已取消置顶：' + name);
+      loadFileList();
+    }).catch(function (err) {
+      btn.disabled = false;
+      alert('置顶失败：' + err.message);
+    });
+  }
+
+  /* ── 链接管理：增删 / 置顶 ── */
+  function loadLinkList() {
+    var wrap = $('linkList');
+    wrap.innerHTML = '<div class="loading"><span class="spinner"></span>加载链接…</div>';
+    fetch('/files.json?t=' + Date.now()).then(function (res) {
+      if (!res.ok) throw new Error('files.json HTTP ' + res.status);
+      return res.json();
+    }).then(function (data) {
+      var links = (data.links || []).filter(function (l) { return l.visible !== false; });
+      if (!links.length) { wrap.innerHTML = '<div class="empty">暂无链接</div>'; return; }
+      links.sort(function (a, b) { return (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0); });
+      wrap.innerHTML = '';
+      links.forEach(function (l) {
+        var item = document.createElement('div');
+        item.className = 'log-item';
+        item.style.cursor = 'default';
+        item.innerHTML =
+          '<span class="sid" style="font-size:13px;">' + esc(l.title) + '</span>' +
+          (l.pinned ? '<span class="badge ok">置顶</span>' : '') +
+          '<span class="meta" style="max-width:40%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(l.url) + '</span>' +
+          '<span class="meta">' +
+          (indexToken && phpReachable
+            ? '<button class="btn sm" data-pin-link="' + esc(l.url) + '">' + (l.pinned ? '取消置顶' : '置顶') + '</button>' +
+              '<button class="btn sm danger" data-del-link="' + esc(l.url) + '">删除</button>'
+            : '<span>需 index 授权</span>') +
+          '</span>' +
+          ((l.desc || (l.tags && l.tags.length))
+            ? '<div class="meta" style="width:100%;margin-top:4px;font-size:12px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' +
+              (l.desc ? esc(l.desc) + '　' : '') +
+              (l.tags && l.tags.length ? '🏷 ' + l.tags.map(esc).join(' · ') : '') +
+              '</div>'
+            : '');
+        item.addEventListener('click', function (e) {
+          var pin = e.target.closest('[data-pin-link]');
+          var del = e.target.closest('[data-del-link]');
+          if (pin) { doPinLink(pin.dataset.pinLink, pin); return; }
+          if (del) {
+            if (!confirm('确定删除该链接？\n' + l.title)) return;
+            doDeleteLink(del.dataset.delLink, del);
+          }
+        });
+        wrap.appendChild(item);
+      });
+    }).catch(function (e) {
+      wrap.innerHTML = '<div class="err">链接加载失败：' + esc(e.message) + '</div>';
+    });
+  }
+
+  function doAddLink() {
+    var title = $('linkTitle').value.trim();
+    var url = $('linkUrl').value.trim();
+    var desc = $('linkDesc').value.trim();
+    var tags = $('linkTags').value.split(/[,，\s]+/).map(function (t) { return t.trim(); }).filter(Boolean);
+    if (!title || !url) { alert('标题和 URL 不能为空'); return; }
+    idxApi('add-link', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: title, url: url, desc: desc, tags: tags })
+    }).then(function () {
+      $('linkTitle').value = '';
+      $('linkUrl').value = '';
+      $('linkDesc').value = '';
+      $('linkTags').value = '';
+      alert('链接已添加');
+      loadLinkList();
+    }).catch(function (e) {
+      alert('添加失败：' + e.message);
+    });
+  }
+
+  function doDeleteLink(url, btn) {
+    btn.disabled = true;
+    idxApi('delete-link', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: url })
+    }).then(function () {
+      alert('链接已删除');
+      loadLinkList();
+    }).catch(function (e) {
+      btn.disabled = false;
+      alert('删除失败：' + e.message);
+    });
+  }
+
+  function doPinLink(url, btn) {
+    btn.disabled = true;
+    idxApi('pin-link', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: url })
+    }).then(function (r) {
+      alert(r.pinned ? '已置顶' : '已取消置顶');
+      loadLinkList();
+    }).catch(function (e) {
+      btn.disabled = false;
+      alert('操作失败：' + e.message);
+    });
+  }
+
+  /* ── 访问统计：/views 明细 ── */
+  function loadViews() {
+    var tbody = $('viewsTable').querySelector('tbody');
+    tbody.innerHTML = '<tr><td colspan="2" class="loading"><span class="spinner"></span>加载浏览量…</td></tr>';
+    idxApi('views').then(function (views) {
+      var entries = Object.keys(views || {}).map(function (k) { return { name: k, count: views[k] }; });
+      entries.sort(function (a, b) { return b.count - a.count; });
+      if (!entries.length) { tbody.innerHTML = '<tr><td colspan="2" class="empty">暂无浏览量记录</td></tr>'; return; }
+      tbody.innerHTML = '<tr><th>文件</th><th class="num">浏览量</th></tr>' +
+        entries.map(function (e) { return '<tr><td>' + esc(e.name) + '</td><td class="num">' + e.count + '</td></tr>'; }).join('');
+    }).catch(function (e) {
+      tbody.innerHTML = '<tr><td colspan="2" class="err">浏览量加载失败：' + esc(e.message) + '</td></tr>';
+    });
+  }
+
+  /* ── 待审核二维码（保留原有逻辑） ── */
+  function loadPendingQrcodes() {
+    var wrap = $('qrList');
+    wrap.innerHTML = '<div class="loading"><span class="spinner"></span>加载待审核…</div>';
+    idxApi('pending_qrcodes').then(function (data) {
+      var list = data.records || [];
+      if (!list.length) { wrap.innerHTML = '<div class="empty">暂无待审核二维码</div>'; return; }
+      wrap.innerHTML = '';
+      list.forEach(function (r) {
+        var info = r.type === 'item'
+          ? esc(r.name || '') + (r.category ? ' · ' + esc(r.category) : '')
+          : (r.provinces && r.provinces.length ? esc(r.provinces.join('/')) : esc(r.province || '')) + ' 老乡群';
+        var item = document.createElement('div');
+        item.className = 'log-item';
+        item.style.cursor = 'default';
+        item.innerHTML =
+          '<span class="sid" style="font-size:12px;">' + esc(r.id) + '</span>' +
+          '<span class="badge warn">' + esc(info) + '</span>' +
+          '<span class="meta"><span>' + esc(r.upload_time || '') + '</span></span>' +
+          '<span class="meta" style="margin-left:0;">' +
+          '<button class="btn sm" data-act="approve" data-id="' + esc(r.id) + '">通过</button>' +
+          '<button class="btn sm danger" data-act="reject" data-id="' + esc(r.id) + '">拒绝</button>' +
+          '</span>';
+        item.addEventListener('click', function (e) {
+          var btn = e.target.closest('[data-act]');
+          if (!btn) return;
+          var act = btn.dataset.act;
+          var decision = act === 'approve' ? 'approve' : 'reject';
+          if (!confirm((decision === 'approve' ? '通过' : '拒绝') + '该二维码申请？\n' + r.id)) return;
+          btn.disabled = true;
+          idxApi('review_qrcode', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: r.id, decision: decision, operator: 'admin' })
+          }).then(function () {
+            alert('已' + (decision === 'approve' ? '通过' : '拒绝'));
+            loadPendingQrcodes();
+          }).catch(function (err) {
+            btn.disabled = false;
+            alert('操作失败：' + err.message);
+          });
+        });
+        wrap.appendChild(item);
+      });
+    }).catch(function (e) {
+      wrap.innerHTML = '<div class="err">待审核列表加载失败：' + esc(e.message) + '</div>';
+    });
+  }
+
+  /* ── QA 内容预览（/qa 端点） ── */
+  function loadQA() {
+    var el = $('qaContent');
+    el.innerHTML = '<div class="loading"><span class="spinner"></span>加载 QA…</div>';
+    fetch('/api.php?action=qa').then(function (res) {
+      return res.json().catch(function () { return {}; });
+    }).then(function (d) {
+      if (!d || d.error) throw new Error((d && d.error) || '加载失败');
+      var preview = String(d.content || '').slice(0, 2000);
+      el.innerHTML = '<div class="dl-text" style="padding:10px 14px;white-space:pre-wrap;word-break:break-word;max-height:320px;overflow:auto;font-size:13px;">' +
+        esc(preview) + (String(d.content || '').length > 2000 ? '\n…（预览截断）' : '') + '</div>';
+    }).catch(function (e) {
+      el.innerHTML = '<div class="err">QA 加载失败：' + esc(e.message) + '</div>';
+    });
+  }
+
+  /* 事件绑定：上传 / 链接 */
+  $('uploadBtn').addEventListener('click', doUpload);
+  $('linkAddBtn').addEventListener('click', doAddLink);
+  $('linkTitle').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); $('linkUrl').focus(); } });
+  $('linkUrl').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); $('linkDesc').focus(); } });
+  $('linkDesc').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); $('linkTags').focus(); } });
+  $('linkTags').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); doAddLink(); } });
+  $('linkUrl').addEventListener('keydown', function (e) { if (e.key === 'Enter') doAddLink(); });
+
+  /* ═══════════════════════════════════════════
+     6. 初始化：默认显示登录页（门禁已移除）
+     ═══════════════════════════════════════════ */
+  showView('viewLogin');
+  $('loginPass').focus();
+})();
+</script>
+</body>
+</html>

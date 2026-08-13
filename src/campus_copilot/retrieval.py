@@ -10,20 +10,23 @@ from typing import Dict, Iterable, List, Optional, Tuple
 
 from .db import chinese_search_terms, connect
 from .source_policy import AUTHORITY_CONFIDENCE
-from .answer_planning import classify_question
+from .config import (
+    ANSWERABILITY_COVERAGE_FLOOR,
+    ANSWERABILITY_MIN_EVIDENCE,
+    ANSWERABILITY_SCORE_FLOOR,
+    load_glossary,
+)
 
 
 SYNONYMS = {
-    "视传": ["视觉传达", "视觉传达设计"],
-    "视觉传达": ["视觉传达设计", "视传"],
-    "中外合办": ["中外合作办学"],
-    "中外合作办学": ["中外合办"],
     "宿舍": ["寝室", "生活区", "床位"],
     "寝室": ["宿舍", "生活区", "床位"],
     "选课": ["课程", "选修课", "选课系统"],
     "报到": ["入学", "新生", "信息采集"],
     "交通": ["摆渡车", "公交", "出行"],
     "成绩": ["绩点", "gpa", "学分"],
+    "gpa": ["绩点", "成绩", "学分绩"],
+    "绩点": ["gpa", "成绩", "学分绩"],
     "吃饭": ["食堂", "餐饮", "饭卡"],
     "床": ["床铺", "床垫"],
     "多大": ["尺寸", "规格", "长", "宽"],
@@ -35,11 +38,10 @@ SYNONYMS = {
 
 DOMAIN_ENTITY_GROUPS = {
     "recommendation_admission": ("保研", "推免", "推荐免试", "免试攻读"),
-    "visual_communication": ("视传", "视觉传达", "视觉传达设计"),
 }
 
-POLICY_TERMS = ("必须", "规定", "办法", "申请", "截止", "毕业", "选课", "成绩", "请假", "军训", "办理")
-LIFESTYLE_TERMS = ("宿舍", "食堂", "快递", "生活费", "好吃", "外卖", "交通", "社团")
+POLICY_TERMS = ("必须", "规定", "办法", "申请", "截止", "毕业", "选课", "成绩", "请假", "办理")
+LIFESTYLE_TERMS = ("宿舍", "食堂", "快递", "生活费", "好吃", "外卖", "交通", "社团", "军训", "摆渡车", "游泳")
 
 CONCEPT_TERMS = (
     "信息采集", "美团外卖", "补退选", "每学期", "几人间", "选课系统",
@@ -48,7 +50,9 @@ CONCEPT_TERMS = (
     "军训", "请假", "校历", "摆渡车", "交通", "绩点", "gpa", "社团", "四级",
     "床垫", "床铺", "尺寸", "规格", "多大", "长", "宽", "床",
     "推荐免试", "免试攻读", "推免", "保研", "保留学籍",
-    "视觉传达设计", "视觉传达", "视传", "中外合作办学", "中外合办",
+    # More specific entities so a query like "游泳池水深" prefers 游泳池
+    # over the generic 游泳 when deciding answerability.
+    "游泳池", "泳池", "游泳馆", "水深", "跑道", "操场",
 )
 
 DIMENSION_QUERY_TERMS = ("多大", "尺寸", "规格", "长宽", "多长", "多宽", "厘米", "cm")
@@ -57,6 +61,23 @@ DIMENSION_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
+# Query tokens that carry no retrieval meaning; the semantic-misalignment gate
+# ignores them so "游泳池水深多少米" keeps 水深/游泳池 as its evidence terms.
+_STOP_TERMS = frozenset({
+    "多少", "怎么", "如何", "什么", "为什么", "是否", "能不能", "可以吗", "怎么去",
+    "怎么办", "哪里", "哪儿", "哪个", "哪些", "几号", "几点", "好久", "多久",
+    "有没有", "是不是", "一个", "这个", "那个", "什么时间", "什么条件", "注意事项",
+    "要求", "安排", "需要", "应该", "请问", "我想", "知道", "了解", "问一下",
+    "吗", "呢", "的", "了", "啊", "吧",
+})
+
+# Attribute/question words are not entities: they describe the ask, so they
+# must not count toward core-entity coverage (e.g. "床垫尺寸多大" keeps 床垫).
+_ATTRIBUTE_TERMS = frozenset({
+    "多大", "尺寸", "规格", "多少", "最低", "最高", "如何", "怎么办",
+    "什么条件", "注意事项", "安排", "要求",
+})
+
 
 def expand_query(query: str) -> str:
     additions: List[str] = []
@@ -64,6 +85,47 @@ def expand_query(query: str) -> str:
         if key in query.lower():
             additions.extend(values)
     return " ".join([query] + additions)
+
+
+# 术语表改写模式（v1.5）：
+#   replace        仅把口语词替换为全称（"学校"->"中国传媒大学海南国际学院"）
+#   append         保留原词并在 query 末尾追加全称（"学校 中国传媒大学海南国际学院"）
+#   replace_append 先替换，再在末尾追加全称（两者叠加，命中信号最强）
+_GLOSSARY_MODE = "replace_append"
+
+
+def rewrite_query_with_glossary(query: str, for_web: bool = False) -> str:
+    """Apply glossary query rewriting for rewrite=true terms (v1.5 / v1.6).
+
+    Only rewrites terms whose glossary entry has rewrite=true (weak-hit
+    colloquial words like 县里/村里/学校). Terms with rewrite=false (e.g.
+    园区, already high-frequency in the corpus) are left untouched so their
+    retrieval weight is not diluted. Idempotent: if the expansion is already
+    present, no second append happens, so chat.py may rewrite before calling
+    search() without double-adding.
+
+    for_web=True (v1.6): rewrites *every* glossary term (rewrite=false included)
+    because a web search engine has no corpus-frequency signal — replacing
+    colloquial words with their full names ("园区"→"海南陵水黎安国际教育创新
+    试验区") improves recall/precision. Used only for the web-search query,
+    never for the local retrieval path.
+    """
+    glossary = load_glossary()
+    rewrite_terms = [entry for entry in glossary if for_web or entry.get("rewrite")]
+    if not rewrite_terms:
+        return query
+    rewritten = query
+    for entry in rewrite_terms:
+        term = entry["term"]
+        expansion = entry["expansion"]
+        if term not in rewritten:
+            continue
+        if _GLOSSARY_MODE in ("replace", "replace_append"):
+            rewritten = rewritten.replace(term, expansion)
+        if _GLOSSARY_MODE in ("append", "replace_append"):
+            if expansion not in rewritten:
+                rewritten = f"{rewritten} {expansion}"
+    return rewritten
 
 
 class LocalSubwordVectorizer:
@@ -121,6 +183,58 @@ def _requested_domain_entities(query: str) -> List[str]:
     ]
 
 
+# Verbs/prepositions that can precede the concrete noun in "可以点X吗/有没有X".
+_SPECIFIC_NOUN_STRIP = (
+    "可以", "能不能", "能否", "能", "点", "叫", "用", "吃", "喝", "买", "玩",
+    "上", "去", "坐", "看", "听", "写", "拿", "带", "办", "申请",
+)
+
+
+def _specific_noun(query: str) -> Optional[str]:
+    """Extract the concrete thing a yes/no or recommendation question asks about.
+
+    Examples: "学校有无人机社团吗" -> 无人机社团; "可以点美团外卖吗" -> 美团外卖;
+    "食堂的招牌菜推荐一下" -> 招牌菜. Returns None for non-existence/recommendation
+    questions (how/what/where…), which don't need this extra gate.
+    """
+    q = query.strip()
+    m = re.search(r"有(?:没有)?([\u4e00-\u9fff]{2,12})吗[？?]?$", q)
+    if not m:
+        m = re.search(r"有没有([\u4e00-\u9fff]{2,12})", q)
+    if not m:
+        m = re.search(r"(?:可以|能不能|能否|能)([\u4e00-\u9fff]{2,12})吗[？?]?$", q)
+    if not m:
+        m = re.search(r"([\u4e00-\u9fff]{2,10})(?:推荐|好吃|好喝)", q)
+    if not m:
+        return None
+    noun = m.group(1)
+    for prefix in _SPECIFIC_NOUN_STRIP:
+        if noun.startswith(prefix):
+            noun = noun[len(prefix):]
+            break
+    return noun or None
+
+
+_GENERIC_NOUN_SUFFIXES = ("机会", "情况", "怎么样", "什么", "时候", "地方", "东西", "吗", "呢", "啊", "吧", "的", "了")
+
+
+def _specific_noun_supported(specific_noun: str, top_blobs: List[str]) -> bool:
+    """True if the concrete noun (or its content core) appears in the evidence.
+
+    "保研机会" is satisfied by evidence containing 保研; "无人机社团" is NOT
+    satisfied by generic 社团 evidence because the specific part 无人机 is what
+    the user actually asked about.
+    """
+    noun = specific_noun
+    for suffix in _GENERIC_NOUN_SUFFIXES:
+        if noun.endswith(suffix) and len(noun) > len(suffix):
+            noun = noun[: -len(suffix)]
+            break
+    segments = [s for s in re.split(r"[的地得]", noun) if s]
+    noun = max(segments, key=len) if segments else noun
+    return bool(noun) and any(noun in blob for blob in top_blobs)
+
+
 def _domain_entity_match(groups: List[str], text: str) -> float:
     if not groups:
         return 0.0
@@ -129,6 +243,31 @@ def _domain_entity_match(groups: List[str], text: str) -> float:
         aliases = DOMAIN_ENTITY_GROUPS[group]
         matched += int(any(alias in text for alias in aliases))
     return matched / len(groups)
+
+
+def _strong_local_evidence(top: Dict[str, object], core_terms: List[str], query: str) -> bool:
+    """v1.6 本地高相关兜底：top1 命中 resource/官方文档且 query 核心词在 title 中。
+
+    本地明明存在强相关文档（如「中传2026-2027年度校历」resource chunk），却因
+    证据条数不足 / score 略低被判不可生成、进而触发联网——这是典型误伤。此规则
+    在证据"质"达标（top1 为权威/resource 且 title 命中核心词）时视为可答，
+    强制走语料回答，联网只作最后兜底。核心词优先用 CONCEPT_TERMS 白名单命中；
+    白名单为空时退化用 query 中最长的连续中文片段。
+    """
+    if not top:
+        return False
+    if top["authority_tier"] not in {"resource", "official_policy", "official_guidance"}:
+        return False
+    title = str(top.get("title") or "")
+    if core_terms and any(term in title for term in core_terms):
+        return True
+    if not core_terms:
+        runs = re.findall(r"[\u4e00-\u9fff]{2,}", query.lower())
+        runs = [run for run in runs if run not in _STOP_TERMS]
+        longest = max(runs, key=len) if runs else ""
+        if len(longest) >= 2 and longest in title:
+            return True
+    return False
 
 
 def _coverage(concepts: List[str], text: str) -> float:
@@ -153,6 +292,19 @@ def _fts_query(query: str) -> str:
 
 
 def _row_to_result(row: sqlite3.Row) -> Dict[str, object]:
+    local_path = str(row["document_local_path"] or "") if "document_local_path" in row.keys() else ""
+    media_type = str(row["document_media_type"] or "") if "document_media_type" in row.keys() else ""
+    source_kind = str(row["document_source_kind"] or "") if "document_source_kind" in row.keys() else ""
+    file_path = None
+    image_thumb = None
+    if local_path:
+        normalized = local_path.replace("\\", "/")
+        if normalized.startswith("/"):
+            file_path = normalized
+        else:
+            file_path = "/" + normalized
+        if media_type == "image" or source_kind == "qr_resource" or media_type == "qr":
+            image_thumb = file_path
     return {
         "chunk_id": row["chunk_id"],
         "document_id": row["document_id"],
@@ -165,6 +317,9 @@ def _row_to_result(row: sqlite3.Row) -> Dict[str, object]:
         "authority_tier": row["authority_tier"],
         "assertion_policy": row["assertion_policy"],
         "source_url": row["source_url"],
+        "file_path": file_path,
+        "media_type": media_type,
+        "image_thumb": image_thumb,
         "cohort": row["cohort"],
         "academic_year": row["academic_year"],
         "student_level": row["student_level"],
@@ -189,18 +344,20 @@ class HybridRetriever:
                       d.uploaded_at AS document_uploaded_at,
                       d.published_at AS document_published_at,
                       d.effective_from AS document_effective_from,
-                      d.date_status AS document_date_status
+                      d.date_status AS document_date_status,
+                      d.local_path AS document_local_path,
+                      d.media_type AS document_media_type,
+                      d.source_kind AS document_source_kind
                FROM chunks c JOIN documents d USING(document_id)"""
         ).fetchall()
 
-    def search(self, query: str, top_k: int = 6, profile: Optional[Dict[str, str]] = None) -> Dict[str, object]:
+    def search(self, query: str, top_k: int = 8, profile: Optional[Dict[str, str]] = None) -> Dict[str, object]:
         profile = profile or {}
+        original_query = query
+        query = rewrite_query_with_glossary(query)
         query_concepts = _query_concepts(query)
         requested_entities = _requested_domain_entities(query)
         availability_query = any(term in query for term in ("有吗", "有没有", "机会", "是否"))
-        historical_outcome_query = any(
-            term in query for term in ("多少人", "多少名", "百分之", "比例", "排到多少", "大概")
-        )
         procedure_query = any(term in query for term in ("怎么", "如何", "操作", "步骤"))
         rule_query = any(term in query for term in ("规定", "最低", "必须", "退课", "学分"))
         dimension_query = any(term in query.lower() for term in DIMENSION_QUERY_TERMS)
@@ -215,6 +372,9 @@ class HybridRetriever:
                               d.published_at AS document_published_at,
                               d.effective_from AS document_effective_from,
                               d.date_status AS document_date_status,
+                              d.local_path AS document_local_path,
+                              d.media_type AS document_media_type,
+                              d.source_kind AS document_source_kind,
                               bm25(chunk_fts) AS fts_rank
                        FROM chunk_fts JOIN chunks c USING(chunk_id)
                        JOIN documents d USING(document_id)
@@ -291,16 +451,6 @@ class HybridRetriever:
                 # Availability questions benefit from a direct observed outcome
                 # alongside policy documents that only establish a mechanism.
                 task_multiplier *= 1.45
-            if (
-                historical_outcome_query
-                and domain_entity_match
-                and row["chunk_type"] == "faq"
-                and re.search(r"(?:\d+\s*人|\d+(?:\.\d+)?%|比例)", row["text"] or "")
-            ):
-                # A question about observed cohort outcomes should prefer an
-                # observed cohort answer over a policy document containing
-                # unrelated scoring formulas.
-                task_multiplier *= 1.7
             applicability = 1.0
             if profile.get("cohort") and row["cohort"] and profile["cohort"] != row["cohort"]:
                 applicability *= 0.75
@@ -339,23 +489,81 @@ class HybridRetriever:
         ranked.sort(key=lambda item: item[0], reverse=True)
 
         results: List[Dict[str, object]] = []
+        visual_evidence: List[Dict[str, object]] = []
         document_counts: Counter = Counter()
-        for score, row, explanation in ranked:
-            per_document_limit = 5 if row["chunk_type"] == "structured_fact" else 2
-            if document_counts[row["document_id"]] >= per_document_limit:
-                continue
+        added_chunk_ids: set = set()
+
+        def _is_visual_row(row: sqlite3.Row) -> bool:
+            media = (
+                row["document_media_type"]
+                if "document_media_type" in row.keys()
+                else row["media_type"] if "media_type" in row.keys() else ""
+            )
+            return (
+                row["chunk_type"] in {"visual_reference", "qr_entry"}
+                or media in {"image", "qr"}
+            )
+
+        def _append(score: float, row: sqlite3.Row, explanation: Dict[str, float], per_doc_limit: int) -> None:
+            if row["chunk_id"] in added_chunk_ids:
+                return
+            if document_counts[row["document_id"]] >= per_doc_limit:
+                return
             item = _row_to_result(row)
             item["score"] = round(score, 6)
             item["score_explanation"] = explanation
-            results.append(item)
+            added_chunk_ids.add(row["chunk_id"])
+            if _is_visual_row(row):
+                visual_evidence.append(item)
+            else:
+                results.append(item)
             document_counts[row["document_id"]] += 1
-            if len(results) >= top_k:
+
+        # Pass 1 — document diversity: at most one text chunk per document so
+        # citations can span multiple different sources (入学指南.pdf + 新生常见
+        # 问题问答库 + 官方政策文件 …). structured_fact rows keep two because
+        # spreadsheet records are atomic and may need adjacent rows. Reserve two
+        # slots so Pass 2 can backfill a second chunk from the top document(s);
+        # otherwise single-source questions would only ever see one evidence.
+        diversity_cap = max(1, top_k - 2)
+        for score, row, explanation in ranked:
+            if len(results) >= diversity_cap:
                 break
+            limit = 2 if row["chunk_type"] == "structured_fact" else 1
+            _append(score, row, explanation, limit)
+
+        # Pass 2 — backfill: fill the remaining slots with a second chunk from
+        # the same document (capped at 2) so single-source questions still
+        # collect enough evidence to pass MIN_EVIDENCE.
+        if len(results) < top_k:
+            for score, row, explanation in ranked:
+                if len(results) >= top_k:
+                    break
+                if row["chunk_type"] == "structured_fact" or _is_visual_row(row):
+                    continue
+                if document_counts[row["document_id"]] != 1:
+                    continue
+                _append(score, row, explanation, 2)
+
+        # Visuals are a separate supplementary channel: collect them regardless
+        # of how full the text slots are so image/QR cards still appear.
+        for score, row, explanation in ranked:
+            if _is_visual_row(row) and document_counts[row["document_id"]] == 0:
+                _append(score, row, explanation, 5)
 
         intent = _intent(query)
         if results:
+            # v1.2: evidence is counted by concept coverage (quality), not only
+            # relative score — a strong corroborating chunk from a second source
+            # must actually cover the query's concepts to count. Counting across
+            # all top_k results (not only [:3]) so backfilled second chunks from
+            # the top document are also credited. Weak hits with low coverage
+            # don't inflate the count.
             decision_floor = float(results[0]["score"]) * 0.65
-            decision_results = [item for item in results[:3] if float(item["score"]) >= decision_floor]
+            decision_results = [
+                item for item in results[:top_k]
+                if float(item.get("score_explanation", {}).get("concept_coverage", 0.0) or 0.0) >= ANSWERABILITY_COVERAGE_FLOOR
+            ]
         else:
             decision_results = []
         has_official = any(item["authority_tier"] in {"official_policy", "official_guidance"} for item in decision_results)
@@ -369,51 +577,138 @@ class HybridRetriever:
             for item in results[:3]
         )
         uncertain = any(item["uncertainty"] for item in results[:3])
-        question_type = classify_question(query)
-        general_guidance_supported = any(
-            any(term in " ".join([
-                str(item.get("title", "")),
-                str(item.get("heading_path", "")),
-                str(item.get("text", "")),
-            ]) for term in ("就业方向", "职业方向", "就业领域", "就业岗位", "从事", "毕业去向"))
-            for item in results[:3]
+
+        # ---- Strict answerability gates (unknown判定强化) ----
+        # 检索不足时宁可拒答也不编造。判定规则：
+        #  1. 无任何检索结果            -> insufficient_no_evidence
+        #  2. top1 绝对分数低于阈值      -> insufficient_low_score
+        #  3. top1 概念覆盖低于阈值      -> insufficient_low_coverage
+        #  4. 有效证据数不足            -> insufficient_evidence_count
+        #  5. 数值型问题(多少/几/米/厘米)但证据不含任何数值 -> insufficient_numeric_evidence
+        insufficient_reason = None
+        numeric_query = bool(
+            re.search(r"(?:多少|几|多大|多长|多宽|多高|几米|几人间|厘米|cm|mm|元|学分|小时|分钟|几天|几个|几名)", query)
+        ) and bool(
+            re.search(r"(?:多少|几|多大|多长|多宽|多高|厘米|cm|mm|元|学分|小时|分钟|天|个|名)", query)
         )
-        top_coverage = float(
-            (results[0].get("score_explanation") or {}).get("concept_coverage", 0.0)
-        ) if results else 0.0
-        top_anchor_coverage = float(
-            (results[0].get("score_explanation") or {}).get("anchor_coverage", 0.0)
-        ) if results else 0.0
-        top_entity_match = float(
-            (results[0].get("score_explanation") or {}).get("domain_entity_match", 0.0)
-        ) if results else 0.0
-        weak_local_match = (
-            bool(results)
-            and max(top_coverage, top_anchor_coverage) < 0.35
-            and top_entity_match < 1.0
-        )
-        if question_type == "general_guidance" and not general_guidance_supported:
-            status = "insufficient"
-        elif weak_local_match:
-            status = "insufficient_relevance"
-        elif not results:
-            status = "insufficient"
-        elif intent == "policy_or_procedure" and not has_official:
-            status = "insufficient_official_evidence"
-        elif has_official and has_peer:
-            status = "mixed_sources_review_required" if uncertain else "supported_with_context"
-        elif has_official:
-            status = "supported_freshness_unverified" if freshness_unknown else "supported"
-        elif has_peer:
-            status = "experience_only"
+        if not results:
+            status = "insufficient_no_evidence"
+            insufficient_reason = "no_retrieved_evidence"
         else:
-            status = "unverified"
+            top_score = float(results[0]["score"])
+            top_coverage = float(
+                results[0].get("score_explanation", {}).get("concept_coverage", 0.0) or 0.0
+            )
+            # A numeric question must find a number *with a measure unit* in the
+            # top evidence; plain numbered list markers (e.g. "6）") don't count.
+            # v1.2: check across the top-3 chunks, not only the top chunk, so
+            # "最低需要选多少学分" can be backed by 选课服务手册's "最低6分".
+            numeric_texts = " ".join(str(r.get("text", "")) for r in results[:3])
+            has_numeric_evidence = bool(
+                re.search(
+                    r"(?:[0-9]+(?:\.[0-9]+)?|[一二三四五六七八九十百千万两])"
+                    r"\s*(?:米|m\b|厘米|cm|mm|毫米|元|人|人间|天|小时|分钟|分|秒|学分|个|名|次|%|％|楼|层|间|床|度|℃)",
+                    numeric_texts,
+                )
+            )
+            # Semantic-misalignment gate: the query's *core entity* must appear
+            # in at least one of the top-3 evidence blobs. Prefer CONCEPT_TERMS
+            # whitelist hits; otherwise fall back to the longest 3-gram of the
+            # query. This catches "游泳池水深多少米" being answered by generic
+            # swimming-course text that never mentions 游泳池/水深.
+            query_blob = expand_query(query).lower()
+            # Prefer the LONGEST whitelist term so "游泳池水深" is matched by
+            # 游泳池 rather than the generic 游泳 (which would wrongly pass).
+            # Single-char whitelist terms (床/长/宽) are too noisy: they match
+            # as substrings of unrelated words and dilute the weighted score.
+            # Attribute/question words (多大/尺寸/规格/多少…) describe the ask
+            # but are not entities; excluding them keeps the gate meaningful.
+            core_terms = sorted(
+                (t for t in CONCEPT_TERMS
+                 if len(t) >= 2 and t not in _ATTRIBUTE_TERMS and t in query_blob),
+                key=len,
+                reverse=True,
+            )
+            if not core_terms:
+                candidates = sorted(
+                    (t for t in chinese_search_terms(query_blob).split()
+                     if len(t) >= 3 and t not in _STOP_TERMS),
+                    key=len,
+                    reverse=True,
+                )
+                core_terms = candidates[:2] if candidates else []
+            # Keep all whitelist hits (not just top-2) so multi-word queries
+            # like "宿舍是几人间" (几人间+宿舍+寝室) get a fair weighted score.
+            top_blobs = [
+                " ".join([
+                    str(r.get("title", "")), str(r.get("heading_path", "")),
+                    " ".join(r.get("tags", [])), str(r.get("text", "")),
+                ]).lower()
+                for r in results[:3]
+            ]
+            # Weighted core-term coverage: longer (more specific) terms matter
+            # more. "游泳池水深多少米" gets 游泳池+泳池+游泳; only generic 游泳
+            # hits the swimming-course evidence -> low weighted coverage -> the
+            # answer would be off-topic, so refuse. "宿舍是几人间" hits 宿舍+寝室
+            # -> sufficient -> answer.
+            core_weight_total = sum(len(t) for t in core_terms)
+            core_hit_total = sum(
+                len(t) for t in core_terms
+                if any(t in blob for blob in top_blobs)
+            ) if core_terms else 0
+            core_coverage = (core_hit_total / core_weight_total) if core_weight_total else 1.0
+            core_hit = core_coverage >= 0.5
+            # Specific-noun gate (v1.2): for yes/no or recommendation questions
+            # ("学校有无人机社团吗", "食堂的招牌菜推荐一下"), the concrete thing
+            # the user asks about must itself appear in the evidence. A generic
+            # whitelist match (社团/食堂) alone would otherwise answer a question
+            # the corpus never covers.
+            specific_noun = _specific_noun(query)
+            specific_noun_missing = bool(specific_noun) and not _specific_noun_supported(
+                specific_noun, top_blobs
+            )
+            if top_score < ANSWERABILITY_SCORE_FLOOR:
+                status = "insufficient_low_score"
+                insufficient_reason = f"top1_score_below_threshold({top_score:.4f}<{ANSWERABILITY_SCORE_FLOOR})"
+            elif top_coverage < ANSWERABILITY_COVERAGE_FLOOR:
+                status = "insufficient_low_coverage"
+                insufficient_reason = f"top1_concept_coverage_below_threshold({top_coverage:.4f}<{ANSWERABILITY_COVERAGE_FLOOR})"
+            elif numeric_query and not has_numeric_evidence:
+                status = "insufficient_numeric_evidence"
+                insufficient_reason = "numeric_query_without_numeric_evidence"
+            elif not core_hit:
+                status = "insufficient_core_entity_missing"
+                insufficient_reason = "query_core_entity_absent_from_evidence"
+            elif specific_noun_missing:
+                status = "insufficient_specific_entity"
+                insufficient_reason = f"query_specific_entity_absent_from_evidence:{specific_noun}"
+            elif len(decision_results) < ANSWERABILITY_MIN_EVIDENCE:
+                status = "insufficient_evidence_count"
+                insufficient_reason = f"evidence_count_below_threshold({len(decision_results)}<{ANSWERABILITY_MIN_EVIDENCE})"
+            elif intent == "policy_or_procedure" and not has_official:
+                status = "insufficient_official_evidence"
+                insufficient_reason = "policy_query_without_official_evidence"
+            elif has_official and has_peer:
+                status = "mixed_sources_review_required" if uncertain else "supported_with_context"
+            elif has_official:
+                status = "supported_freshness_unverified" if freshness_unknown else "supported"
+            elif has_peer:
+                status = "experience_only"
+            else:
+                status = "unverified"
+        # v1.7 生成链路改造：answerability 保留计算但已降级为"检索信号"
+        # （evidence_signal），只供 LLM/前端参考，不再阻塞生成。旧链路
+        # （LLM_FREE_ANSWER=0）仍用该字段做 can_generate 判决，故保留计算。
+        # v1.6 的 _strong_local_evidence 强兜底已删除：新链路由 LLM 自主判断，
+        # 不再需要"拉回可答"的规则。
         return {
-            "query": query,
+            "query": original_query,
+            "rewritten_query": query,
             "intent": intent,
             "retrieval_mode": "fts5_plus_local_subword_rrf",
             "answerability": status,
+            "insufficient_reason": insufficient_reason,
             "requires_uncertainty_label": uncertain,
-            "local_match_quality": "weak" if weak_local_match else ("usable" if results else "none"),
             "results": results,
+            "visual_evidence": visual_evidence,
         }

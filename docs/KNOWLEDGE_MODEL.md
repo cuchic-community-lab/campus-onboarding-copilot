@@ -37,6 +37,12 @@ the actual retrieval time and extracted passage. A fetched webpage does not
 silently become a durable knowledge-base document; promotion into the indexed
 corpus requires the normal ingestion and review process.
 
+The governed official-site synchronizer is that promotion path. It maintains
+immutable content-addressed page versions outside Git, while a small state file
+tracks the current checksum and `pending`, `approved`, or `rejected` status.
+New or changed content is never indexed before explicit review. During a build,
+only the latest approved version becomes an `official_web` document.
+
 ## Chunking policy
 
 | Source | Unit | Why |
@@ -77,6 +83,9 @@ FAQ answers depend on their questions; procedure steps depend on their order.
    routes, deduplicate discovered URLs with registry results, and apply the same
    evidence contract. Missing credentials produce registry-only behavior rather
    than a false claim that open-web search ran.
+10. Run official-site synchronization independently of user questions. Promote
+    only reviewed snapshots, and reset approval whenever the page checksum
+    changes.
 
 Retrieval relevance and answer trust are separate concerns. Student-authored
 guides and measurements may rank first when they directly answer a lifestyle

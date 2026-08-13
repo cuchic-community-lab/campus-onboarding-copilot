@@ -1,0 +1,597 @@
+[
+  {
+    "id": "C001",
+    "group": "本地问答",
+    "kind": "chat",
+    "query": "宿舍是几人间",
+    "expect": {
+      "source": "corpus",
+      "answerable": true,
+      "must_contain": [
+        "四人"
+      ]
+    },
+    "note": "基础问答"
+  },
+  {
+    "id": "C002",
+    "group": "本地问答",
+    "kind": "chat",
+    "query": "军训多长时间",
+    "expect": {
+      "source": "corpus",
+      "answerable": true,
+      "must_contain": [
+        "军训"
+      ]
+    },
+    "note": "军训时长"
+  },
+  {
+    "id": "C003",
+    "group": "本地问答",
+    "kind": "chat",
+    "query": "学校怎么选课",
+    "expect": {
+      "source": "corpus",
+      "answerable": true,
+      "must_contain": [
+        "选课"
+      ]
+    },
+    "note": "选课操作"
+  },
+  {
+    "id": "C004",
+    "group": "本地问答",
+    "kind": "chat",
+    "query": "怎么看校历",
+    "expect": {
+      "source": "corpus",
+      "answerable": true,
+      "must_contain": [
+        "校历"
+      ]
+    },
+    "note": "校历资源"
+  },
+  {
+    "id": "C005",
+    "group": "本地问答",
+    "kind": "chat",
+    "query": "新生报到要带什么",
+    "expect": {
+      "source": [
+        "corpus",
+        "refusal"
+      ],
+      "answerable": [
+        true,
+        false
+      ],
+      "must_contain": [
+        "报到"
+      ],
+      "note": "报到内容必须完整"
+    },
+    "note": "报到材料"
+  },
+  {
+    "id": "C006",
+    "group": "本地问答",
+    "kind": "chat",
+    "query": "食堂有什么好吃的",
+    "expect": {
+      "source": "corpus",
+      "answerable": true,
+      "must_contain": [
+        "食堂"
+      ],
+      "must_not_contain": [
+        "深职"
+      ]
+    },
+    "note": "食堂（探针发现答成深职院=BUG）"
+  },
+  {
+    "id": "C007",
+    "group": "本地问答",
+    "kind": "chat",
+    "query": "洗衣机怎么用",
+    "expect": {
+      "source": "corpus",
+      "answerable": true,
+      "must_contain": [
+        "洗衣机"
+      ]
+    },
+    "note": "生活设施"
+  },
+  {
+    "id": "C008",
+    "group": "本地问答",
+    "kind": "chat",
+    "query": "GPA怎么算",
+    "expect": {
+      "source": "corpus",
+      "answerable": true,
+      "must_contain_any": [
+        "绩点",
+        "GPA"
+      ]
+    },
+    "note": "绩点计算"
+  },
+  {
+    "id": "C009",
+    "group": "本地问答",
+    "kind": "chat",
+    "query": "园区摆渡车怎么坐",
+    "expect": {
+      "source": "corpus",
+      "answerable": true,
+      "must_contain": [
+        "摆渡车"
+      ]
+    },
+    "note": "摆渡车"
+  },
+  {
+    "id": "D001",
+    "group": "术语消歧",
+    "kind": "chat",
+    "query": "园区摆渡车怎么坐",
+    "expect": {
+      "source": "corpus",
+      "answerable": true,
+      "must_contain": [
+        "摆渡车"
+      ]
+    },
+    "note": "园区=试验区语境"
+  },
+  {
+    "id": "D002",
+    "group": "术语消歧",
+    "kind": "chat",
+    "query": "学校怎么选课",
+    "expect": {
+      "source": "corpus",
+      "answerable": true,
+      "must_contain": [
+        "选课"
+      ],
+      "retrieval_contains": [
+        "中国传媒大学海南国际学院"
+      ]
+    },
+    "note": "学校→海南国际学院改写生效"
+  },
+  {
+    "id": "D003",
+    "group": "术语消歧",
+    "kind": "chat",
+    "query": "县里怎么去",
+    "expect": {
+      "source": "corpus",
+      "answerable": true,
+      "must_contain": [
+        "陵水"
+      ],
+      "retrieval_contains": [
+        "陵水黎族自治县县城"
+      ]
+    },
+    "note": "县里→陵水县城改写"
+  },
+  {
+    "id": "D004",
+    "group": "术语消歧",
+    "kind": "chat",
+    "query": "村里在哪",
+    "expect": {
+      "source": "corpus",
+      "answerable": true,
+      "must_contain": [
+        "大墩村"
+      ],
+      "retrieval_contains": [
+        "大墩村"
+      ]
+    },
+    "note": "村里→大墩村改写"
+  },
+  {
+    "id": "D005",
+    "group": "术语消歧",
+    "kind": "chat",
+    "query": "学校去县城多长时间",
+    "expect": {
+      "source": "corpus",
+      "answerable": true,
+      "must_contain_any": [
+        "40",
+        "陵水"
+      ],
+      "must_not_contain": [
+        "聊城",
+        "容县"
+      ]
+    },
+    "note": "答非所问回归（探针发现答成报到须知=BUG）"
+  },
+  {
+    "id": "D006",
+    "group": "术语消歧",
+    "kind": "chat",
+    "query": "学校食堂几点开门",
+    "expect": {
+      "source": "corpus",
+      "answerable": true,
+      "must_contain": [
+        "食堂"
+      ],
+      "retrieval_contains": [
+        "中国传媒大学海南国际学院"
+      ]
+    },
+    "note": "学校→海南国际学院改写"
+  },
+  {
+    "id": "R001",
+    "group": "拒答/答非所问",
+    "kind": "chat",
+    "query": "清华大学在哪个城市",
+    "expect": {
+      "source": "refusal",
+      "answerable": false,
+      "must_contain_any": [
+        "师哥师姐",
+        "知识库"
+      ],
+      "must_not_contain": [
+        "游泳队"
+      ]
+    },
+    "note": "校园外问题应拒答（探针发现答成游泳队新闻=BUG）"
+  },
+  {
+    "id": "R002",
+    "group": "拒答/答非所问",
+    "kind": "chat",
+    "query": "游泳池水深多少米",
+    "expect": {
+      "source": [
+        "corpus",
+        "refusal"
+      ],
+      "answerable": [
+        true,
+        false
+      ],
+      "must_not_contain": [
+        "游泳池工程",
+        "竞赛标准水深2米",
+        "设计标准"
+      ],
+      "note": "不得答成通用泳池工程知识；诚实说未提及水深可接受"
+    },
+    "note": "无本地材料应拒答（探针发现答成通用泳池知识=BUG）"
+  },
+  {
+    "id": "R003",
+    "group": "拒答/答非所问",
+    "kind": "chat",
+    "query": "量子纠缠宿舍",
+    "expect": {
+      "source": [
+        "corpus",
+        "refusal"
+      ],
+      "answerable": [
+        true,
+        false
+      ],
+      "must_not_contain": [
+        "量子纠缠原理",
+        "上帝效应"
+      ],
+      "note": "不得幻觉硬答量子物理"
+    },
+    "note": "完全不存在的话题不可幻觉硬答（探针发现幻觉=BUG）"
+  },
+  {
+    "id": "R004",
+    "group": "拒答/答非所问",
+    "kind": "chat",
+    "query": "麻辣香锅多少钱",
+    "expect": {
+      "source": [
+        "corpus",
+        "refusal"
+      ],
+      "answerable": [
+        true,
+        false
+      ],
+      "must_not_contain": [
+        "阿里巴巴",
+        "淘宝",
+        "底料"
+      ],
+      "note": "不得答无关电商"
+    },
+    "note": "不可答成电商价格（探针发现答成淘宝底料=BUG）"
+  },
+  {
+    "id": "R005",
+    "group": "拒答/答非所问",
+    "kind": "chat",
+    "query": "学校有动物园吗",
+    "expect": {
+      "source": "refusal",
+      "answerable": false,
+      "must_contain_any": [
+        "师哥师姐",
+        "知识库"
+      ],
+      "must_not_contain": [
+        "一体两翼",
+        "简介"
+      ]
+    },
+    "note": "不可答成学院简介（探针发现=BUG）"
+  },
+  {
+    "id": "R006",
+    "group": "拒答/答非所问",
+    "kind": "chat",
+    "query": "宿舍楼顶能烧烤吗",
+    "expect": {
+      "source": [
+        "corpus",
+        "refusal"
+      ],
+      "answerable": [
+        true,
+        false
+      ],
+      "must_not_contain": [
+        "法律咨询"
+      ],
+      "note": "不得答成法律咨询"
+    },
+    "note": "不可答成法律咨询（探针发现=BUG）"
+  },
+  {
+    "id": "R007",
+    "group": "拒答/答非所问",
+    "kind": "chat",
+    "query": "学校游泳池在哪",
+    "expect": {
+      "source": [
+        "corpus",
+        "refusal"
+      ],
+      "answerable": [
+        true,
+        false
+      ],
+      "must_not_contain": [
+        "游泳比赛"
+      ],
+      "note": "不得答成游泳比赛新闻"
+    },
+    "note": "不可答成2018游泳比赛新闻（探针发现=BUG）"
+  },
+  {
+    "id": "W001",
+    "group": "联网搜索",
+    "kind": "chat",
+    "query": "三亚天气怎么样",
+    "expect": {
+      "source": "web_search",
+      "answerable": false,
+      "must_contain": [
+        "三亚"
+      ]
+    },
+    "note": "天气联网"
+  },
+  {
+    "id": "W002",
+    "group": "联网搜索",
+    "kind": "chat",
+    "query": "今天陵水天气",
+    "expect": {
+      "source": "web_search",
+      "answerable": false,
+      "must_contain": [
+        "陵水"
+      ]
+    },
+    "note": "陵水天气"
+  },
+  {
+    "id": "W003",
+    "group": "联网搜索",
+    "kind": "chat",
+    "query": "园区最近有什么新闻",
+    "expect": {
+      "source": "web_search",
+      "answerable": false,
+      "must_contain": [
+        "陵水"
+      ]
+    },
+    "note": "园区新闻必须命中陵水（防误配陵县/滕州）"
+  },
+  {
+    "id": "W004",
+    "group": "联网搜索",
+    "kind": "chat",
+    "query": "三亚到北京的航班",
+    "expect": {
+      "source": "web_search",
+      "answerable": false,
+      "must_contain_any": [
+        "三亚",
+        "北京"
+      ]
+    },
+    "note": "航班查询"
+  },
+  {
+    "id": "W005",
+    "group": "联网搜索",
+    "kind": "chat",
+    "query": "海南省高考录取分数线",
+    "expect": {
+      "source": "web_search",
+      "answerable": false,
+      "must_contain_any": [
+        "海南",
+        "高考"
+      ]
+    },
+    "note": "高考政策"
+  },
+  {
+    "id": "W006",
+    "group": "联网搜索",
+    "kind": "chat",
+    "query": "园区附近有什么好吃的",
+    "expect": {
+      "source": "web_search",
+      "answerable": false,
+      "must_contain": [
+        "陵水"
+      ]
+    },
+    "note": "本地美食防误配"
+  },
+  {
+    "id": "S001",
+    "group": "师哥师姐链路",
+    "kind": "senior_ask",
+    "query": "军训要带什么？",
+    "expect": {
+      "http_status": 200,
+      "question_id_present": true
+    },
+    "note": "学生侧提问"
+  },
+  {
+    "id": "S002",
+    "group": "师哥师姐链路",
+    "kind": "senior_answers",
+    "query": "军训要带什么？",
+    "expect": {
+      "http_status": 200,
+      "contains_own_question": true
+    },
+    "note": "查自己的提问"
+  },
+  {
+    "id": "S003",
+    "group": "师哥师姐链路",
+    "kind": "senior_full",
+    "query": "军训要带什么？",
+    "expect": {
+      "http_status": 200,
+      "final_status": "answered",
+      "reply_text_contains": [
+        "防晒"
+      ]
+    },
+    "note": "ask→answers→reply 全流程"
+  },
+  {
+    "id": "M001",
+    "group": "多轮/追问",
+    "kind": "chat",
+    "query": "宿舍是几人间",
+    "followup": [
+      "那床多大"
+    ],
+    "expect": {
+      "min_turns": 2,
+      "answerable": true,
+      "must_contain_any": [
+        "床",
+        "宿舍"
+      ]
+    },
+    "note": "追问需带上下文"
+  },
+  {
+    "id": "M002",
+    "group": "多轮/追问",
+    "kind": "chat",
+    "query": "食堂几点开门",
+    "followup": [
+      "具体呢"
+    ],
+    "expect": {
+      "min_turns": 2,
+      "answerable": true,
+      "must_contain_any": [
+        "食堂",
+        "开放时间",
+        "几点"
+      ]
+    },
+    "note": "追问具体化"
+  },
+  {
+    "id": "M003",
+    "group": "多轮/追问",
+    "kind": "chat",
+    "query": "宿舍是几人间",
+    "followup": [
+      "那床多大",
+      "具体呢"
+    ],
+    "expect": {
+      "min_turns": 3,
+      "answerable": true,
+      "must_contain_any": [
+        "床",
+        "宿舍"
+      ]
+    },
+    "note": "两次追问不脱节（探针发现答成作品介绍=BUG）"
+  },
+  {
+    "id": "E001",
+    "group": "边界",
+    "kind": "chat",
+    "query": "",
+    "expect": {
+      "http_status": 400,
+      "error": "query_required"
+    },
+    "note": "空 query 应 400"
+  },
+  {
+    "id": "E002",
+    "group": "边界",
+    "kind": "chat",
+    "query": "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+    "expect": {
+      "http_status": 400,
+      "error": "query_too_long"
+    },
+    "note": "超长 501 字应 400"
+  },
+  {
+    "id": "E003",
+    "group": "边界",
+    "kind": "chat",
+    "query": "@@@$$$###",
+    "expect": {
+      "http_status": 200
+    },
+    "note": "纯符号不应崩溃"
+  }
+]

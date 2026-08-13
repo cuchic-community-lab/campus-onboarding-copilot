@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "user_agent": "CampusOnboardingCopilot/0.2 (+official corpus sync)",
+  "max_page_bytes": 1500000,
+  "request_timeout_seconds": 12,
+  "sources": [
+    {
+      "source_id": "cuc-hainan",
+      "issuer": "中国传媒大学海南国际学院",
+      "campus": "CUCHIC",
+      "seed_urls": ["https://hainan.cuc.edu.cn/"],
+      "allowed_hosts": ["hainan.cuc.edu.cn"],
+      "allowed_path_prefixes": ["/"],
+      "max_pages_per_run": 40,
+      "tags": ["学校官网", "海南国际学院"]
+    },
+    {
+      "source_id": "cuc-international",
+      "issuer": "中国传媒大学国际传媒教育学院",
+      "campus": "CUC-Beijing",
+      "seed_urls": ["https://icuc.cuc.edu.cn/"],
+      "allowed_hosts": ["icuc.cuc.edu.cn"],
+      "allowed_path_prefixes": ["/"],
+      "max_pages_per_run": 30,
+      "tags": ["学校官网", "中外合作办学"]
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+[q1] source=corpus answerable=True judgment=answer unknown=False answer=我找到的材料里没有直接写从学校到县城要多久，所以这个我暂时不确定。不过按咱们学校的位置（在陵水黎安国际教育创新试验区），到陵水县城一般打车或坐公交大概二三十分钟，具体得看路况和交通方式。建议你到时候可
+[q2] source=refusal answerable=False judgment=refuse unknown=True answer=我找到的材料和你问的不太相关，搜到的是咱们学校请假、选课、游泳考试这些校园生活相关的资料，没有关于清华大学位置的信息。如果你是想问咱们学校（中国传媒大学海南国际学院）在哪儿，那是在海南陵水黎安国际教育
+[q3] source=corpus answerable=True judgment=answer unknown=False answer=我找到的材料里没有麻辣香锅的具体价格，只有食堂自选餐约0.6元每两、平均一顿饭20元上下的信息（据往届经验）。麻辣香锅的价格可能因窗口和分量而异，建议你到时候直接去食堂看看，或者问问师哥师姐。
+[q4] source=corpus answerable=True judgment=answer unknown=False answer=据往届师哥师姐的经验，园区目前开放三个食堂：一号食堂（麦当劳所在地）、一区食堂和二区食堂，分别位于公共实验楼北侧、生活一区和生活二区。生活三区理论上设有三区食堂，但开业情况未知。关于口味，师哥师姐的推
+[q5] source=corpus answerable=True judgment=answer unknown=False answer=据往届经验，咱们园区宿舍一般是四人寝，但前几年新生都是四人寝两人住，也就是有四张床位但只住两个人，可以随便选床位。不过今年园区新生特别多，有9所学校的新生入驻，所以26级新生可能会变成四人寝四人住，这
+[q6] source=refusal answerable=False judgment=refuse unknown=True answer=我找到的材料和你问的不太相关，搜到的是宿舍、选课、入学准备这些校园生活的内容，没有三亚天气的实时信息。天气这种得看实时预报，建议你直接打开手机天气App查一下，或者问问已经在海南的师哥师姐，他们最清楚
