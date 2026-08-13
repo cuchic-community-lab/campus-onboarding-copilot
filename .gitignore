@@ -11,3 +11,4 @@ data/senior/
 data/sync-report.json
 data/audit-report.json
 *.log
+.env.local.bak*
