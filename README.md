@@ -7,12 +7,6 @@ answers; and routes unresolved cases to a human follow-up queue.
 
 > **Live application:** [XiaohaiGPT](https://hic.zihuanana.top/xiaohaigpt.html)<br>
 > **Source library:** [HIC onboarding portal](https://hic.zihuanana.top/)<br>
-> The live application runs the experimental `xiaohaigpt` branch. `main`
-> contains the reviewed RAG, evaluation, tracing, handoff, and deployment
-> baseline documented below.
-
-This is an independent student project. Time-sensitive policies should be
-verified against the latest university notice.
 
 ## Product overview
 
