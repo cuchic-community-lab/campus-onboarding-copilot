@@ -20,13 +20,14 @@ from .config import (
     SITE_ROOT,
     describe_corpus,
     ensure_dirs,
+    admin_token,
     load_env,
 )
 from .chat import GroundedChatService
 from .composition import OpenAICompatibleComposer, ProviderConfig
 from .context_builder import build_context_packet
 from .retrieval import HybridRetriever
-from .service import build_knowledge_base, corpus_stats
+from .service import build_knowledge_base, corpus_stats, inject_knowledge
 from . import senior
 
 
@@ -125,15 +126,18 @@ class AppHandler(BaseHTTPRequestHandler):
         if path == "/api/sessions/stats":
             self._json(self._session_stats())
             return
-        if path in {"/", "/index.html", "/xiaohaigpt.html"}:
-            # /xiaohaigpt.html 优先返回聊天页；/ 与 /index.html 在聊天页存在时也作为首页返回
-            has_chat = (WEB_ROOT / "xiaohaigpt.html").is_file()
-            if path == "/xiaohaigpt.html" and has_chat:
-                target = WEB_ROOT / "xiaohaigpt.html"
-            elif path in {"/", "/index.html"} and has_chat:
-                target = WEB_ROOT / "xiaohaigpt.html"
+        if path in {"/", "/index", "/index.html", "/xiaohaigpt", "/xiaohaigpt.html", "/admin", "/admin.html"}:
+            # 美化 URL 支持无扩展名：/xiaohaigpt、/admin、/index 与带 .html 等价
+            if path in {"/admin", "/admin.html"}:
+                target = WEB_ROOT / "admin.html"
             else:
-                target = WEB_ROOT / "index.html"
+                has_chat = (WEB_ROOT / "xiaohaigpt.html").is_file()
+                if path in {"/xiaohaigpt", "/xiaohaigpt.html"} and has_chat:
+                    target = WEB_ROOT / "xiaohaigpt.html"
+                elif path in {"/", "/index", "/index.html"} and has_chat:
+                    target = WEB_ROOT / "xiaohaigpt.html"
+                else:
+                    target = WEB_ROOT / "index.html"
             if not target.is_file():
                 self._json({"error": "index_missing"}, 404)
                 return
@@ -146,6 +150,11 @@ class AppHandler(BaseHTTPRequestHandler):
             # 站点根 logo 目录（favicon/header/welcome 的 svg 图）
             rel = unquote(path[len("/logo/"):])
             self._static((SITE_ROOT / "logo" / rel).resolve())
+            return
+        if path.startswith("/fonts/"):
+            # 站点根 fonts 目录（Google Sans / Oppo Sans 的 woff2）
+            rel = unquote(path[len("/fonts/"):])
+            self._static((SITE_ROOT / "fonts" / rel).resolve())
             return
         if path.startswith("/files/"):
             rel = unquote(path[len("/files/"):])
@@ -185,6 +194,18 @@ class AppHandler(BaseHTTPRequestHandler):
                 force = bool(payload.get("force", False))
                 with self.build_lock:
                     result = build_knowledge_base(DB_PATH, force=force)
+                self._refresh_services()
+                self._json(result)
+                return
+
+            if path == "/api/kb/inject":
+                # 知识库注入：SENIOR_ADMIN_TOKEN 鉴权 → 文本解析入库 → 增量重建
+                if str(payload.get("token", "")) != admin_token():
+                    self._json({"error": "token_required"}, 401)
+                    return
+                text = str(payload.get("text", ""))
+                with self.build_lock:
+                    result = inject_knowledge(text, DB_PATH)
                 self._refresh_services()
                 self._json(result)
                 return
@@ -385,7 +406,7 @@ class AppHandler(BaseHTTPRequestHandler):
             return
 
         files = []
-        for p in sorted(DIALOG_LOG_DIR.glob("*.md")):
+        for p in DIALOG_LOG_DIR.glob("*.md"):
             if not p.is_file():
                 continue
             try:
@@ -398,7 +419,10 @@ class AppHandler(BaseHTTPRequestHandler):
                 "created_at": _log_created_at(text) or _iso_from_mtime(p),
                 "lines": text.count("\n") + 1 if text else 0,
                 "size": p.stat().st_size,
+                "refusals": _count_log_refusals(text),
             })
+        # 会话日志按时间倒序（最新在前）
+        files.sort(key=lambda f: str(f.get("created_at") or ""), reverse=True)
         self._json({"files": files, "total": len(files), "dir": str(DIALOG_LOG_DIR)})
 
     def log_message(self, format: str, *args: object) -> None:
@@ -447,6 +471,19 @@ def _log_created_at(text: str) -> Optional[str]:
 def _iso_from_mtime(path: Path) -> str:
     """mtime 兜底：文件系统修改时间转 ISO（无秒以下精度）。"""
     return time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime(path.stat().st_mtime))
+
+
+def _count_log_refusals(text: str) -> int:
+    """统计日志中的拒答/未回答条数：metadata 里 answerable=false 或 judgment 为 refuse/need_web。"""
+    n = 0
+    for m in re.finditer(r"<!--\s*metadata:\s*(\{.*?\})\s*-->", text, re.S):
+        try:
+            meta = json.loads(m.group(1))
+        except (ValueError, TypeError):
+            continue
+        if (not meta.get("answerable", True)) or meta.get("judgment") in ("refuse", "need_web"):
+            n += 1
+    return n
 
 
 def serve(host: str = "127.0.0.1", port: int = 8000, auto_build: bool = True) -> None:

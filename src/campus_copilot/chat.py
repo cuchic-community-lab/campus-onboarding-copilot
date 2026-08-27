@@ -31,6 +31,9 @@ CORRECTION_PATTERNS = (
 # v1.7 实时信息兜底：LLM 对天气/新闻/票价等实时问题可能倾向拒答而非 need_web，
 # query 命中这些词且 judgment=refuse 时，后端强制尝试联网（兜底，非硬约束）。
 REALTIME_TERMS = ("天气", "新闻", "最新", "预报", "今天", "明天", "实时", "温度", "台风", "降雨", "雨", "气温")
+# 学校固定文件类（校历/作息/教学安排…）：不属于实时信息，禁止被 REALTIME_TERMS 兜底强制联网
+#（"最新校历"这类问题本地知识库有内容，搜出来往往是对外省校本部的不适用信息）
+SCHEDULE_TERMS = ("校历", "作息", "教学安排", "培养方案", "报到安排", "上课时间", "放假", "开学时间")
 
 
 def _compose_web_answer(query: str, results: List[Dict[str, object]]) -> Dict[str, object]:
@@ -580,7 +583,12 @@ class GroundedChatService:
         web_needed = bool(composition.get("web_search_needed")) or judgment == "need_web"
         # v1.7 实时信息兜底：LLM 判 refuse 但 query 命中实时词 → 强制尝试联网，
         # 避免"三亚天气"这类实时问题被拒答（prompt 已引导，此处兜底）。
-        if not web_needed and judgment == "refuse" and any(term in query for term in REALTIME_TERMS):
+        # 校历/作息/安排类固定文件除外（本地有内容，联网反而得到不适用信息）。
+        if (
+            not web_needed and judgment == "refuse"
+            and any(term in query for term in REALTIME_TERMS)
+            and not any(term in query for term in SCHEDULE_TERMS)
+        ):
             web_needed = True
         citations = [str(item) for item in composition.get("citations", [])]
         citation_metadata = build_citation_metadata(context)

@@ -504,6 +504,11 @@ class HybridRetriever:
                 or media in {"image", "qr"}
             )
 
+        # 图片佐证相关性门槛：只展示与 top 文本证据可比的图片（≥ top 的 35%），
+        # 避免低分图片（如问 GPA 时误带校历图）被无差别展示
+        top_score = ranked[0][0] if ranked else 0.0
+        min_visual_score = top_score * 0.35
+
         def _append(score: float, row: sqlite3.Row, explanation: Dict[str, float], per_doc_limit: int) -> None:
             if row["chunk_id"] in added_chunk_ids:
                 return
@@ -514,7 +519,8 @@ class HybridRetriever:
             item["score_explanation"] = explanation
             added_chunk_ids.add(row["chunk_id"])
             if _is_visual_row(row):
-                visual_evidence.append(item)
+                if score >= min_visual_score:
+                    visual_evidence.append(item)
             else:
                 results.append(item)
             document_counts[row["document_id"]] += 1

@@ -1,9 +1,29 @@
 {
   "_comment": "术语表（用户可自行维护）。字段说明：term=用户口语词；expansion=规范全称；rewrite=true 检索前改写 query（弱命中词提升召回）/ false 不改写（语料已高频命中，避免稀释权重）；note=备注。修改后无需重启，服务每次请求重新读取（TERMS_ENABLED=1 时生效）。下划线 _ 开头的键为注释，加载时忽略。",
   "glossary": [
-    {"term": "园区", "expansion": "海南陵水黎安国际教育创新试验区", "note": "新生口中的园区即试验区", "rewrite": false},
-    {"term": "学校", "expansion": "中国传媒大学海南国际学院", "note": "注意与中传本部区分", "rewrite": true},
-    {"term": "县里", "expansion": "陵水黎族自治县县城", "note": "", "rewrite": true},
-    {"term": "村里", "expansion": "陵水黎族自治县黎安镇大墩村", "note": "", "rewrite": true}
+    {
+      "term": "园区",
+      "expansion": "海南陵水黎安国际教育创新试验区",
+      "note": "新生口中的园区即试验区",
+      "rewrite": false
+    },
+    {
+      "term": "学校",
+      "expansion": "中国传媒大学海南国际学院",
+      "note": "注意与中传本部区分",
+      "rewrite": true
+    },
+    {
+      "term": "县里",
+      "expansion": "陵水黎族自治县县城",
+      "note": "",
+      "rewrite": true
+    },
+    {
+      "term": "村里",
+      "expansion": "大墩村",
+      "note": "",
+      "rewrite": true
+    }
   ]
 }

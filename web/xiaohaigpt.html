@@ -7,6 +7,11 @@
 <title>XiaohaiGPT · AI 咨询</title>
 <link rel="icon" type="image/svg+xml" href="logo/logo-00-07.svg">
 <style>
+/* 自定义字体：Google Sans（拉丁/数字）优先，Oppo Sans（中文）兜底（2026-08-13） */
+@font-face { font-family:'Google Sans'; src:url('fonts/GoogleSansFlex.woff2') format('woff2'); font-display:swap; font-weight:100 900; }
+@font-face { font-family:'Oppo Sans'; src:url('fonts/OppoSans-subset.woff2') format('woff2'); font-display:swap; font-weight:100 900; }
+
+
   /* ─────────────────────────────────────────────
      XiaohaiGPT · 独立聊天页
      视觉与 index.html 同源（CSS 变量 / 深浅色 / 字体栈）
@@ -51,7 +56,7 @@
   *,*::before,*::after { box-sizing:border-box; margin:0; padding:0 }
   html,body { height:100% }
   body {
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;
+    font-family:'Google Sans','Oppo Sans',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;
     background:var(--bg); color:var(--text); line-height:1.5;
     display:flex; flex-direction:column; overflow:hidden;
     -webkit-tap-highlight-color:transparent;
@@ -113,6 +118,7 @@
     width:100%; text-align:center; order:-1;
     font-size:11px; color:var(--text-muted); line-height:1.4;
     padding:0 2px; user-select:none;
+    animation:none !important;  /* 时间直接显示，不随消息气泡弹入动画 */
   }
   .msg-body { flex:1; min-width:0; display:flex; flex-direction:column; gap:6px }
   .msg.user .msg-body { align-items:flex-end }
@@ -272,6 +278,12 @@
   }
   #input:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(37,99,235,.15) }
   #input::placeholder { color:var(--text-muted) }
+  /* 输入框滚动条：仅在内容超出行数时出现，细窄内嵌不占布局 */
+  #input { scrollbar-width:thin; scrollbar-color:var(--border) transparent }
+  #input::-webkit-scrollbar { width:6px }
+  #input::-webkit-scrollbar-track { background:transparent }
+  #input::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px }
+  #input::-webkit-scrollbar-thumb:hover { background:var(--accent) }
   #sendBtn {
     width:42px; height:42px; border-radius:12px; border:none; flex-shrink:0;
     background:var(--accent); color:#fff; cursor:pointer; display:flex;
@@ -362,6 +374,21 @@
     animation-timing-function: var(--ease-out) !important;
     animation-fill-mode: both !important;
   }
+  /* 侧边浮动导航：回顶/回底（右侧垂直居中，半透明圆钮） */
+  .side-nav {
+    position:fixed; right:10px; top:50%; transform:translateY(-50%);
+    display:flex; flex-direction:column; gap:10px; z-index:900;
+  }
+  .side-btn {
+    width:38px; height:38px; border-radius:50%;
+    border:1px solid var(--border); background:var(--card); color:var(--text-muted);
+    font-size:16px; line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center;
+    box-shadow:var(--shadow); transition:all .15s; -webkit-tap-highlight-color:transparent;
+  }
+  .side-btn:hover { color:var(--accent); border-color:var(--accent); transform:scale(1.06) }
+  .side-btn:active { transform:scale(.95) }
+  @media (max-width:480px) { .side-btn { width:32px; height:32px; font-size:14px } }
+
   /* 尊重系统"减弱动态"：动画与平滑滚动整体禁用 */
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
@@ -381,7 +408,7 @@
       <source srcset="logo/logo-00-04.svg" media="(prefers-color-scheme: dark)">
       <img src="logo/logo-00-01.svg" alt="XiaohaiGPT">
     </picture>
-    <a class="back-btn" href="index.html" aria-label="返回文件库">← 返回文件库</a>
+    <a class="back-btn" href="/" aria-label="返回文件库">← 返回文件库</a>
   </div>
 </header>
 
@@ -409,12 +436,18 @@
   </div>
   <div class="input-wrap">
     <button id="clearBtn" type="button" aria-label="清空会话" title="清空会话">🗑<span class="clr-txt">清空会话</span></button>
-    <textarea id="input" rows="1" placeholder="输入你的问题，例如：宿舍是几人间？" autocomplete="off" enterkeyhint="send"></textarea>
+    <textarea id="input" rows="1" placeholder="随便问点什么" autocomplete="off" enterkeyhint="send"></textarea>
     <button id="sendBtn" aria-label="发送" disabled>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4Z"/></svg>
     </button>
   </div>
 </footer>
+
+<!-- 侧边浮动导航：回到顶部 / 回到底部 -->
+<div class="side-nav" id="sideNav">
+  <button class="side-btn" id="toTopBtn" aria-label="回到顶部" title="回到顶部">↑</button>
+  <button class="side-btn" id="toBottomBtn" aria-label="回到底部" title="回到底部">↓</button>
+</div>
 
 <script>
 (function(){
@@ -765,7 +798,6 @@
     /* 联网回答优先展示 search_results；为空则用 citation_metadata 兜底 */
     const citeHTML = hasSearch ? searchResultsHTML(data.search_results, data.search_tier_used) : citationsHTML(data.citation_metadata);
     div.innerHTML =
-      timeTagHTML(t) +
       '<div class="msg-body">' +
         tagHTML +
         '<div class="bubble md">' + renderAnswerWithRefs(data.answer) + '</div>' +
@@ -838,14 +870,13 @@
     const div = document.createElement('div');
     div.className = 'msg ai';
     div.innerHTML =
-      timeTagHTML(t) +
       '<div class="msg-body">' +
         '<div class="bubble md">' + renderAnswerWithRefs(data.answer || '') + '</div>' +
         '<div class="unknown-card">' +
           '<div class="u-head"><span class="u-ico">🤔</span><span class="u-title">知识库暂无相关材料</span></div>' +
           '<div class="u-text">' + esc(data.answer || '') + '</div>' +
-          '<div class="u-hint">检索到了相关内容，但不足以形成可靠结论，我不编造。</div>' +
-          '<button class="u-btn" data-senior-ask="' + esc(data.query || '') + '">试试问师哥师姐 →</button>' +
+          '<div class="u-hint">这个我不太确定，暂时没有把握，不想乱说。可以试试转师哥师姐答疑。</div>' +
+          '<button class="u-btn" data-senior-ask="' + esc(data.query || '') + '">转师哥师姐答疑 →</button>' +
         '</div>' +
         visualEvidenceHTML(data.visual_evidence) +
       '</div>';
@@ -1003,7 +1034,7 @@
   function attachSeniorCta(question) {
     const wrap = document.createElement('div');
     wrap.className = 'senior-cta';
-    wrap.innerHTML = '<button data-senior-ask="' + esc(question) + '">问题没有解决？问师哥师姐 →</button>';
+    wrap.innerHTML = '<button data-senior-ask="' + esc(question) + '">问题没有解决？转师哥师姐答疑 →</button>';
     chatWrap.appendChild(wrap);
     scrollBottom();
   }
@@ -1195,12 +1226,33 @@
   /* ═══════════════════════════════════════════
      9. 事件绑定
      ═══════════════════════════════════════════ */
-  /* 打开引用链接：PDF 内联预览（同页打开，本地后端已对 PDF 返回 inline 头，避免 Content-Disposition 触发下载），
-     其余类型（excel/图片/网页链接等）保持新窗口。 */
+  /* 打开引用链接（2026-08-14 按类型分流）：
+     图片（png/jpg/gif/webp 等）→ 新窗口查看大图
+     链接（http/https）→ 新窗口跳转
+     md 文档 → 无反应
+     其他文件 → 文件库确认后跳转定位（文件库没有则不打开） */
+  const REF_IMG_EXT = ['png','jpg','jpeg','gif','webp','svg','bmp','avif'];
   function openRefHref(href) {
     if (!href) return;
-    if (/\.pdf(\?|#|$)/i.test(href)) { location.href = href; return; }
-    window.open(href, '_blank', 'noopener,noreferrer');
+    const fileName = decodeURIComponent(href.split(/[?#]/)[0].split('/').pop() || '');
+    const ext = (fileName.split('.').pop() || '').toLowerCase();
+    if (REF_IMG_EXT.indexOf(ext) >= 0) { window.open(href, '_blank', 'noopener,noreferrer'); return; }
+    if (ext === 'md') return;
+    if (/^https?:\/\//i.test(href)) { window.open(href, '_blank', 'noopener,noreferrer'); return; }
+    if (!fileName) return;
+    fetch('files.json?t=' + Date.now()).then(function (r) { return r.json(); }).then(function (data) {
+      const files = data.files || [];
+      const hit = files.find(function (f) { return (f.name || f.filename || f.title || '') === fileName; });
+      if (!hit) return; // 文件库没有 → 不打开
+      if (localStorage.getItem('ref_to_lib_once') === '1') { goOpenInLib(fileName); return; }
+      if (confirm('这个文件在文件库中，是否转到文件库打开？')) {
+        localStorage.setItem('ref_to_lib_once', '1');
+        goOpenInLib(fileName);
+      }
+    }).catch(function () { /* 文件库查询失败则不打开 */ });
+  }
+  function goOpenInLib(fileName) {
+    location.href = '/?open=' + encodeURIComponent(fileName);
   }
   function autoGrow() {
     inputEl.style.height = 'auto';
@@ -1209,7 +1261,7 @@
   /* 隐藏入口：输入 19541954 → 清空输入并跳转统一后台（不提交为问题） */
   const ADMIN_CODE = '19541954';
   inputEl.addEventListener('input', () => {
-    if (inputEl.value === ADMIN_CODE) { inputEl.value = ''; location.href = 'admin.html'; return; }
+    if (inputEl.value === ADMIN_CODE) { inputEl.value = ''; location.href = 'admin'; return; }
     autoGrow();
     sendBtn.disabled = sending || !inputEl.value.trim();
   });
@@ -1231,10 +1283,13 @@
     if (adminSeq === ADMIN_CODE) {
       adminSeq = '';
       e.preventDefault(); e.stopPropagation();
-      location.href = 'admin.html';
+      location.href = 'admin';
     }
   });
   clearBtn.addEventListener('click', clearSession);
+  /* 侧边导航：回到顶部 / 回到底部（滚动容器 = chatArea） */
+  document.getElementById('toTopBtn').addEventListener('click', () => { const m = document.getElementById('chatArea'); m.scrollTo({ top: 0, behavior: 'smooth' }); });
+  document.getElementById('toBottomBtn').addEventListener('click', () => { const m = document.getElementById('chatArea'); m.scrollTo({ top: m.scrollHeight, behavior: 'smooth' }); });
   /* 事件委托：chip / [Sx] 引用跳转 / 引用卡片点击 / 问师哥师姐 */
   chatWrap.addEventListener('click', e => {
     const chip = e.target.closest('.chip');
@@ -1264,11 +1319,11 @@
       if (href) openRefHref(href);
       return;
     }
-    /* 图片佐证卡片：点击新窗口打开原图（契约 v1.1 §3.2.2） */
+    /* 图片佐证卡片：同样走引用打开逻辑（不直接下载；文件库有则确认转文件库） */
     const veCard = e.target.closest('.ve-card');
     if (veCard) {
       const href = veCard.dataset.veHref;
-      if (href) { window.open(href, '_blank', 'noopener,noreferrer'); }
+      if (href) { openRefHref(href); }
       return;
     }
     const askBtn = e.target.closest('[data-senior-ask]');
@@ -1305,25 +1360,14 @@
     setInterval(checkModelHealth, 60000);
     /* 默认禁用发送按钮直到有输入 */
     sendBtn.disabled = true;
-    /* 智能滚动：若滚到底会裁切欢迎区（问题部分）则保持顶部可见；长历史才定位到最新消息 */
+    /* 刷新后固定显示最顶端界面（欢迎区在顶部） */
     scrollInit();
   }
-  /* 内容不满一屏不滚；欢迎区下方内容不足欢迎区高度时保持顶部（避免刷新后"问题部分"被滚出视口）；
-     仅当历史足够长（欢迎区必然完全滚出）时才滚到底部定位最新消息。 */
+  /* 刷新后固定显示最顶端界面（欢迎区/历史起点），用户可随时用侧边按钮回到底部 */
   function scrollInit() {
     requestAnimationFrame(() => {
       const main = document.getElementById('chatArea');
-      const welcome = document.getElementById('welcome');
-      const scrollable = main.scrollHeight - main.clientHeight;
-      if (scrollable <= 0) return;
-      if (welcome) {
-        const mr = main.getBoundingClientRect();
-        const wr = welcome.getBoundingClientRect();
-        const wBottomInMain = wr.top - mr.top + main.scrollTop + wr.height;
-        /* welcome 下方内容高度 < welcome 高度：滚动会让欢迎区被裁切 → 保持顶部 */
-        if (scrollable < wBottomInMain + wr.height) return;
-      }
-      main.scrollTo({ top: scrollable, behavior: 'auto' });
+      main.scrollTo({ top: 0, behavior: 'auto' });
     });
   }
   init();

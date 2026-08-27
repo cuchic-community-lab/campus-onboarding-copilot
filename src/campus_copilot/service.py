@@ -1,11 +1,12 @@
 import json
+import re
 import time
 from collections import Counter
 from pathlib import Path
 from typing import Dict, List
 
 from .chunking import chunk_document, chunk_faq
-from .config import AI_ASSISTED_CHUNKING, DB_PATH, PROCESSED_DIR, ensure_dirs
+from .config import AI_ASSISTED_CHUNKING, DB_PATH, PROCESSED_DIR, QA_DIR, ensure_dirs
 from .db import connect, incremental_sync, rebuild
 from .extractors import load_documents
 from .models import ChunkRecord, DocumentRecord
@@ -129,3 +130,73 @@ def audit_corpus(db_path: Path = DB_PATH) -> Dict[str, object]:
         }
     finally:
         connection.close()
+
+
+# ═══════════════════════════════════════════════════════════════
+# 知识库注入：把纯文本自动整理为 RAG 问答条目（追加 qa/新生常见问题.md 后重建索引）
+# 输入约定：
+#   - 每条用空行分隔；支持「问题：xxx / 回答：yyy」或「Q1: xxx + 正文」
+#   - 无显式问题的纯文本：首句（问句优先）作为问题，其余为回答
+# ═══════════════════════════════════════════════════════════════
+def parse_inject_units(text: str) -> List[Dict[str, str]]:
+    units: List[Dict[str, str]] = []
+    blocks = re.split(r"\n\s*\n", text or "")
+    for block in blocks:
+        block = block.strip()
+        if not block:
+            continue
+        lines = [line.strip() for line in block.splitlines() if line.strip()]
+        if not lines:
+            continue
+        question = None
+        answer_lines: List[str] = []
+        for line in lines:
+            m = re.match(r"^(?:问题|问)\s*[:：]\s*(.*)$", line)
+            if m and question is None:
+                question = m.group(1).strip()
+                continue
+            m2 = re.match(r"^Q\d+\s*[:：]\s*(.*)$", line)
+            if m2 and question is None:
+                question = m2.group(1).strip()
+                continue
+            m3 = re.match(r"^(?:回答|答)\s*[:：]\s*(.*)$", line)
+            if m3 and not answer_lines:
+                answer_lines.append(m3.group(1).strip())
+                continue
+            answer_lines.append(line)
+        if question is None:
+            first = lines[0]
+            if ("？" in first or "?" in first) and len(lines) > 1:
+                question = first
+                answer_lines = lines[1:]
+            else:
+                question = first[:24] + ("…" if len(first) > 24 else "")
+                answer_lines = lines
+        answer = "\n".join(answer_lines).strip()
+        if not answer:
+            answer = question
+        units.append({"question": question, "answer": answer})
+    return units
+
+
+def inject_knowledge(text: str, db_path: Path = DB_PATH) -> Dict[str, object]:
+    """解析文本 → 追加到独立文件 qa/问答补充.md（不污染新生常见问题.md 等 QA 展示文件）→ 增量重建索引。
+    RAG 自动收录 qa/ 下所有非彩蛋 md，新文件无需额外配置。"""
+    units = parse_inject_units(text)
+    if not units:
+        return {"ok": False, "error": "没有可解析的内容", "added": 0}
+    faq_path = QA_DIR / "问答补充.md"
+    existing = faq_path.read_text(encoding="utf-8") if faq_path.exists() else ""
+    max_n = 0
+    for m in re.finditer(r"## Q(\d+)\s*:", existing):
+        max_n = max(max_n, int(m.group(1)))
+    blocks = []
+    for i, unit in enumerate(units, start=max_n + 1):
+        blocks.append(f"## Q{i}: {unit['question']}\n\n{unit['answer']}\n")
+    with faq_path.open("a", encoding="utf-8") as handle:
+        if existing and not existing.endswith("\n"):
+            handle.write("\n")
+        handle.write("\n" + "\n".join(blocks))
+    # 增量同步只覆盖已注册文档，新 md 文件必须全量重建才会被 RAG 收录
+    result = build_knowledge_base(db_path, force=True)
+    return {"ok": True, "added": len(units), "questions": [u["question"] for u in units], "build": result}

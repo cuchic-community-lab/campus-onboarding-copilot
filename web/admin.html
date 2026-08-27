@@ -4,7 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>字画虾虾 · 双系统管理后台</title>
+<link rel="icon" type="image/svg+xml" href="logo/logo-00-12.svg">
 <style>
+/* 自定义字体：Google Sans（拉丁/数字）优先，Oppo Sans（中文）兜底（2026-08-13） */
+@font-face { font-family:'Google Sans'; src:url('fonts/GoogleSansFlex.woff2') format('woff2'); font-display:swap; font-weight:100 900; }
+@font-face { font-family:'Oppo Sans'; src:url('fonts/OppoSans-subset.woff2') format('woff2'); font-display:swap; font-weight:100 900; }
+
+
   :root {
     --bg: #f4f6fb;
     --card: #ffffff;
@@ -43,7 +49,7 @@
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    font-family: 'Google Sans','Oppo Sans',-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
     background: var(--bg);
     color: var(--text);
     line-height: 1.6;
@@ -179,6 +185,9 @@
   .dl-row { padding: 8px 16px; }
   .dl-row.user { background: var(--accent-soft); }
   .dl-row.ai { background: transparent; }
+  /* 拒答条目高亮：红边 + 淡红底，一眼可见 */
+  .dl-row.ai.refused { background: var(--danger-soft); border-left: 3px solid var(--danger); }
+  .dl-row.ai.refused .dl-tag .role.ai { color: var(--danger); }
   .dl-tag { font-size: 11px; font-family: var(--mono); color: var(--text-dim); margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
   .dl-tag .role { font-weight: 700; }
   .dl-tag .role.user { color: var(--accent); }
@@ -213,6 +222,18 @@
     border-radius: 10px; padding: 9px 12px; font-size: 13px; outline: none; font-family: inherit;
   }
   .idx-form input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  /* 知识库注入文本域：圆角卡片感 + focus 高亮 + 内嵌细滚动条 */
+  .idx-form textarea {
+    width: 100%; min-height: 120px; resize: vertical;
+    background: var(--bg); border: 1px solid var(--card-border); color: var(--text);
+    border-radius: 12px; padding: 12px 14px; font-size: 13px; line-height: 1.6;
+    outline: none; font-family: inherit; transition: border-color .15s, box-shadow .15s;
+    scrollbar-width: thin; scrollbar-color: var(--card-border) transparent;
+  }
+  .idx-form textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .idx-form textarea::-webkit-scrollbar { width: 6px }
+  .idx-form textarea::-webkit-scrollbar-track { background: transparent }
+  .idx-form textarea::-webkit-scrollbar-thumb { background: var(--card-border); border-radius: 3px }
   .idx-form-hint { font-size: 12px; color: var(--text-dim); width: 100%; }
 
   /* 师哥师姐答题 */
@@ -277,6 +298,15 @@
 
     <!-- ─── Tab A：XiaohaiGPT 后台（会话日志 + 师哥师姐答题） ─── -->
     <section class="tab-pane" id="tab-xg">
+      <h3>知识库注入</h3>
+      <div class="card">
+        <div class="idx-form">
+          <textarea id="kbInjectText" rows="7" placeholder="粘贴要入库的知识文本，支持三种写法：&#10;1. 多条问答（空行分隔）：&#10;   问题：xxx&#10;   回答：yyy&#10;&#10;   问题：zzz&#10;   回答：www&#10;2. 带编号：Q1: 标题 + 正文&#10;3. 纯文本：首句自动作为问题标题&#10;内容存入独立文件（qa/问答补充.md），不修改 Q&A 展示文件；保存后自动重建索引"></textarea>
+          <div class="meta" id="kbInjectStatus" style="font-size:12px;color:var(--text-muted);"></div>
+          <button class="btn primary" id="kbInjectBtn">保存到知识库</button>
+        </div>
+      </div>
+
       <h3>师哥师姐答题 · 待答</h3>
       <div class="card">
         <div id="seniorList" class="log-list" style="padding:10px;"></div>
@@ -332,6 +362,19 @@
           <button class="btn primary sm" id="linkAddBtn">添加链接</button>
         </div>
         <div id="linkList" class="log-list" style="padding:10px;"></div>
+      </div>
+
+      <h3>滚动 Banner 设置</h3>
+      <div class="card">
+        <div class="idx-form" id="bannerForm">
+          <input type="text" id="bannerText" placeholder="Banner 文字（置空 = 不显示）" maxlength="120" autocomplete="off">
+          <input type="text" id="bannerLink" placeholder="跳转链接（如 https://... 或 /xxx）" maxlength="300" autocomplete="off">
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-secondary);cursor:pointer;">
+            <input type="checkbox" id="bannerLinkEnabled"> 点击 Banner 跳转链接
+          </label>
+          <button class="btn primary sm" id="bannerSaveBtn">保存 Banner</button>
+          <div class="meta" id="bannerStatus" style="font-size:12px;color:var(--text-muted);"></div>
+        </div>
       </div>
 
       <h3>文件浏览量明细</h3>
@@ -531,7 +574,11 @@
   function renderLogs(list) {
     var wrap = $('listWrap');
     var kw = $('filterInput').value.trim().toLowerCase();
-    var filtered = kw ? list.filter(function (f) { return f.session_id.toLowerCase().indexOf(kw) !== -1; }) : list;
+    /* 兜底按时间倒序（最新在前） */
+    var sorted = (list || []).slice().sort(function (a, b) {
+      return String(b.created_at || '').localeCompare(String(a.created_at || ''));
+    });
+    var filtered = kw ? sorted.filter(function (f) { return f.session_id.toLowerCase().indexOf(kw) !== -1; }) : sorted;
     if (!filtered.length) {
       wrap.innerHTML = '<div class="empty">' + (kw ? '无匹配会话' : '暂无日志') + '</div>';
       return;
@@ -543,6 +590,7 @@
       btn.innerHTML =
         '<span class="sid">' + esc(shortId(f.session_id)) + '</span>' +
         '<span class="badge">' + (f.lines ?? 0) + ' 行</span>' +
+        (f.refusals ? '<span class="badge warn" title="拒答/未回答次数">⚠️ ' + f.refusals + ' 拒答</span>' : '') +
         '<span class="meta"><span>' + esc(f.created_at || '') + '</span></span>';
       btn.addEventListener('click', function () { openDetail(f); });
       wrap.appendChild(btn);
@@ -564,15 +612,17 @@
 
   function renderDialog(content) {
     var lines = (content || '').split('\n');
-    var html = '', curRole = null, curTime = '', buf = [];
+    var html = '', curRole = null, curTime = '', curMeta = null, buf = [];
     function flush() {
       if (!curRole) return;
       var text = buf.join('\n').trim();
       if (text) {
         var roleCls = curRole === 'user' ? 'user' : 'ai';
         var roleName = curRole === 'user' ? '用户' : 'AI';
+        var refused = curRole === 'ai' && curMeta && (curMeta.answerable === false || curMeta.judgment === 'refuse' || curMeta.judgment === 'need_web');
+        if (refused) roleCls += ' refused';
         html += '<div class="dl-row ' + roleCls + '"><div class="dl-tag">' +
-          '<span class="role ' + roleCls + '">' + roleName + '</span>' +
+          '<span class="role ' + roleCls + '">' + roleName + (refused ? ' ⚠️拒答' : '') + '</span>' +
           '<span>' + esc(curTime) + '</span></div>' +
           '<div class="dl-text">' + esc(text) + '</div></div>';
       }
@@ -583,10 +633,14 @@
       if (line.indexOf('## ') === 0) {
         flush();
         var m = line.match(/^##\s*(.*?)\s*\|\s*(user|ai)\s*$/i);
-        if (m) { curTime = m[1]; curRole = m[2].toLowerCase(); }
+        if (m) { curTime = m[1]; curRole = m[2].toLowerCase(); curMeta = null; }
         else { curRole = null; }
       } else if (line.indexOf('<!--') === 0) {
-        // 注释行跳过
+        /* 解析 metadata 注释：记录 answerable/judgment 供拒答标注 */
+        var mm = line.match(/metadata:\s*(\{.*\})/);
+        if (mm) {
+          try { curMeta = JSON.parse(mm[1]); } catch (e) { curMeta = null; }
+        }
       } else {
         buf.push(line);
       }
@@ -753,6 +807,7 @@
     loadLinkList();
     loadViews();
     loadQA();
+    loadBannerAdmin();
     // 用统一密码自动授权，成功后加载鉴权数据
     autoIdxAuth().then(function (ok) {
       if (!ok) {
@@ -954,6 +1009,37 @@
     });
   }
 
+  /* ── 滚动 Banner 管理：读配置 / 保存（内容置空 = 不显示） ── */
+  function loadBannerAdmin() {
+    if (!$('bannerText')) return;
+    fetch('/api.php?action=banner', { cache: 'no-store' }).then(function (r) {
+      return r.json().catch(function () { return {}; });
+    }).then(function (d) {
+      var b = (d && d.banner) || {};
+      $('bannerText').value = b.text || '';
+      $('bannerLink').value = b.link || '';
+      $('bannerLinkEnabled').checked = !!b.link_enabled;
+      $('bannerStatus').textContent = (b.text ? '当前已启用' + (b.link_enabled && b.link ? '（可点击跳转）' : '') : '当前未启用（置空状态）');
+    }).catch(function () {
+      if ($('bannerStatus')) $('bannerStatus').textContent = '加载失败';
+    });
+  }
+  function saveBanner() {
+    var text = $('bannerText').value.trim();
+    var link = $('bannerLink').value.trim();
+    var enabled = $('bannerLinkEnabled').checked;
+    idxApi('save-banner', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: text, link: link, link_enabled: enabled })
+    }).then(function () {
+      $('bannerStatus').textContent = text ? '已保存（Banner 已生效）' : '已保存（已清空，Banner 不显示）';
+      alert('Banner 已保存');
+    }).catch(function (e) {
+      alert('保存失败：' + e.message);
+    });
+  }
+
   /* ── 链接管理：增删 / 置顶 ── */
   function loadLinkList() {
     var wrap = $('linkList');
@@ -1134,9 +1220,33 @@
     });
   }
 
-  /* 事件绑定：上传 / 链接 */
+  /* ── 知识库注入：文本 → RAG 问答条目（copilot /api/kb/inject，需 xhg 登录密码） ── */
+  function kbInject() {
+    var text = $('kbInjectText').value.trim();
+    var status = $('kbInjectStatus');
+    if (!text) { status.textContent = '请先粘贴要入库的文本'; return; }
+    if (!adminPass) { status.textContent = '请先输入管理密码登录（本页 XiaohaiGPT 后台密码）'; return; }
+    $('kbInjectBtn').disabled = true;
+    status.textContent = '正在整理入库并重建索引…';
+    api('/api/kb/inject', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: adminPass, text: text })
+    }).then(function (d) {
+      status.textContent = '✅ 已入库 ' + d.added + ' 条：' + (d.questions || []).join('、');
+      $('kbInjectText').value = '';
+    }).catch(function (e) {
+      status.textContent = '❌ 失败：' + e.message;
+    }).finally(function () {
+      $('kbInjectBtn').disabled = false;
+    });
+  }
+
+  /* 事件绑定：上传 / 链接 / Banner */
   $('uploadBtn').addEventListener('click', doUpload);
   $('linkAddBtn').addEventListener('click', doAddLink);
+  $('bannerSaveBtn').addEventListener('click', saveBanner);
+  $('kbInjectBtn').addEventListener('click', kbInject);
   $('linkTitle').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); $('linkUrl').focus(); } });
   $('linkUrl').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); $('linkDesc').focus(); } });
   $('linkDesc').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); $('linkTags').focus(); } });
