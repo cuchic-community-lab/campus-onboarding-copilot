@@ -1,157 +1,309 @@
 # Campus Onboarding Copilot
 
-A runnable, trust-aware grounded-chat prototype for incoming students. The
-included CUCHIC adapter uses the public corpus at
-`https://hic.zihuanana.top/` as a demo instance.
+An evidence-grounded AI customer service agent for incoming university students.
+It turns fragmented FAQs, policy documents, service manuals, and student
+experience into cited answers, while escalating unresolved cases for human
+follow-up.
 
-## Origin and collaboration
+> **Live experience:** [XiaohaiGPT student demo](https://hic.zihuanana.top/xiaohaigpt.html)<br>
+> **Source library:** [HIC onboarding portal](https://hic.zihuanana.top/)<br>
+> The live experience runs the experimental `xiaohaigpt` branch. The reviewed
+> RAG, evaluation, tracing, and deployment baseline lives on `main`.
 
-The original HIC onboarding knowledge base and public source site were created
-and are maintained by **Zihuanana**. **Pengwei Fu** designed and implemented
-the retrieval, grounded-generation, evaluation, and cloud-model integration
-layers in this repository. New work is intended to be developed through issues,
-reviewed pull requests, and an explicit shared-maintenance agreement.
+This is an independent student-built project, not an official university
+service. Users should verify time-sensitive policies against the latest school
+notice.
 
-This is an independent student-built project. It is not an official university
-service, and retrieved policies must still be checked against the latest school
-notice. Source attribution does not by itself grant a license to redistribute
-the underlying documents; code and content licensing will be documented
-separately before a public release.
+## Product in action
 
-The system separates retrieval from generation. It finds evidence, preserves
-provenance, recognizes unofficial experience, and abstains when evidence is
-incomplete. A configurable model may compose the final answer, but it never
-becomes the source of truth. Without a model credential, an auditable local
-composer keeps the complete product path runnable.
+### Grounded answer and unresolved-case handoff
 
-The answer layer follows a student-ambassador contract: identify whether the
-student needs an observed cohort outcome, a current rule, campus experience, or
-general career guidance; answer the actual question first; keep audit citation
-tokens out of the visible prose; and show only the sources actually used below
-the answer. A historical outcome such as `14 of 85 students` is never silently
-promoted into a permanent official quota.
+![XiaohaiGPT answering a dormitory question with cited evidence and a human follow-up state](docs/assets/student-chat-grounded-answer.jpg)
 
-The product surface is a mobile-first fusion of the original student resource
-library and the grounded assistant. Files, useful links, tags, and all original
-student Q&A remain directly browsable and searchable. The Copilot opens as a
-bottom sheet on phones and a floating panel on larger screens, so asking a
-question never replaces access to the source library. Multi-turn follow-up,
-source provenance, unresolved boundaries, and human handoff are rendered in the
-same panel.
+The student-facing experience answers from retrieved evidence, exposes the
+supporting-source drawer, and keeps a human-response state in the same
+conversation when the case needs follow-up.
 
-## Why this is an indexed knowledge base
+### Searchable source library
 
-The durable layer is SQLite, not a vector database:
+![HIC onboarding source library with filters, official documents, service manuals, and student resources](docs/assets/source-library.jpg)
 
-- `documents` stores provenance, authority, dates, applicability, checksums,
-  and parse status.
-- `chunks` stores meaning-preserving retrieval units and citation locations.
-- `chunk_fts` provides inspectable lexical retrieval over Chinese bigrams,
-  titles, headings, and tags.
-- local hashed subword vectors provide an offline second retrieval channel.
-- reciprocal-rank fusion combines the two channels; semantic/attribute
-  relevance and student applicability dominate ranking. Authority is retained
-  as answer metadata and only a small near-tie signal, so a directly relevant
-  student measurement is not suppressed by an unrelated official passage.
+The assistant does not replace source access. Students can still search and
+browse the underlying policies, manuals, forms, links, and peer-maintained
+resources directly.
 
-The local vector channel is a reproducible baseline, not a claim of deep
-semantic understanding. Replace `LocalSubwordVectorizer` with a production
-embedding provider later while keeping the document and citation model.
+## The customer-service problem
 
-## Domain-aware chunking
+Incoming students repeatedly ask questions such as:
 
-- FAQ: one question and its complete answer is one chunk.
-- Safe student spreadsheets: one measured item per structured fact chunk.
-- Policy/handbook: preserve heading path and page, then group complete
-  paragraphs into roughly 350-800 Chinese characters.
-- Procedures: keep numbered steps together whenever possible.
-- Forms and external links: model them as resources/actions instead of using
-  them as factual answer passages.
-- Images and scanned PDFs: remain non-assertable until OCR succeeds.
+- “How many people share a dorm room?”
+- “How do I complete new-student information collection?”
+- “What are the course add/drop rules?”
+- “What should I do if the available documents do not answer my case?”
 
-Student-authored guides and measurements are first-class evidence in this
-student-built product. They are cited as student experience rather than
-silently upgraded to school policy. Privacy-sensitive record spreadsheets
-remain quarantined.
+The information exists, but is distributed across formal policies, service
+manuals, student-maintained FAQs, spreadsheets, attachments, and changing web
+pages. A fluent chatbot alone is unsafe: official rules and peer experience
+have different authority, documents may be stale, and some questions require a
+human rather than a generated answer.
 
-No fixed-token splitter is used across all sources. Fixed token windows cut a
-condition away from its rule, split a procedure in the middle, and destroy FAQ
-question-answer boundaries.
+The product goal is therefore **end-to-end issue resolution**, not answer
+generation alone:
 
-## Run
+1. understand the student's intent and context;
+2. retrieve the most applicable evidence;
+3. decide whether the evidence is sufficient to answer;
+4. compose and validate a grounded response;
+5. expose sources and uncertainty;
+6. route unresolved cases to a human queue;
+7. turn failed queries into evaluation and knowledge-base improvements.
 
-The runtime has one lightweight required parser, `pypdf`, because governed
-web retrieval may read registered official PDF sources in real time.
+## Product experience
 
-```bash
-make sync       # download manifest, Q&A, and public files
-make build      # normalize, chunk, and build SQLite indexes
-make audit      # inspect authority, parsing, privacy, and freshness gaps
-make evaluate   # run labeled retrieval and answerability checks
-make evaluate-chat # check citation, refusal, and peer-label contracts
-make publication-audit # reject tracked secrets and generated/private corpus files
-make demo       # run an uncertainty-sensitive example query
-make serve      # open http://127.0.0.1:8000
+| Stage | Student experience | Agent behavior |
+| --- | --- | --- |
+| Ask | Natural-language, multi-turn chat | Classifies the question and resolves explicit follow-ups |
+| Find | No need to know document names | Searches local knowledge and, when governed, reviewed web sources |
+| Answer | Direct response followed by supporting sources | Separates official policy, official guidance, public context, and peer experience |
+| Verify | Visible citations and unresolved boundaries | Validates citations, authority, applicability, and refusal rules |
+| Escalate | Optional email follow-up when self-service fails | Stores a redacted query, trace ID, and opt-in contact in a private queue |
+| Improve | Better coverage over time | Operators inspect failure traces and convert repeated gaps into corpus or product work |
+
+## System architecture
+
+```mermaid
+flowchart LR
+    U[Student] --> UI[Responsive chat + source library]
+    UI --> O[Agent orchestrator]
+
+    O --> P[Intent and answer-shape planner]
+    P --> LR[Local retrieval tool]
+    P --> WR[Governed web retrieval tool]
+
+    KB[(SQLite knowledge base)] --> LR
+    REG[Reviewed source registry] --> WR
+    LR --> F[Applicability filter + rank fusion]
+    WR --> F
+
+    F --> A{Answerable?}
+    A -->|Yes| C[LLM answer composer]
+    C --> V[Grounding and citation validator]
+    V --> UI
+    A -->|No| H[Human handoff tool]
+    V -->|Validation fails| H
+    H --> Q[(Private follow-up queue)]
+    H --> UI
+
+    O --> T[(Privacy-aware execution traces)]
+    P --> T
+    F --> T
+    C --> T
+    V --> T
+    H --> T
+    T --> E[Evaluation and iteration loop]
+    E --> P
+    E --> KB
 ```
 
-For the reviewed single-server production baseline, see
-[`deploy/README.md`](deploy/README.md). It provides a non-root application
-container, Caddy HTTPS termination, health checks, automatic restart, public
-chat rate limiting, and a persistent private volume for traces and opt-in email
-handoffs. Real credentials remain in the ignored `deploy/.env.production` file
-on the server.
+The LLM is an answer composer—not the knowledge base, retrieval judge, or final
+authority. The application can fall back to an auditable local composer when a
+model is unavailable or its response fails validation.
 
-For a short-lived remote preview, set a strong one-time access code before
-starting the server. This enables a login gate, signed four-hour HttpOnly
-cookie, same-origin POST checks, per-client login/chat rate limits, no-store
-caching, and browser security headers:
+## How one query is resolved
 
-```bash
-CAMPUS_PREVIEW_ACCESS_CODE='at-least-16-random-characters' \
-CAMPUS_PREVIEW_ALLOWED_ORIGINS='https://exact-preview-host.example' make serve
+```text
+question + student profile + recent turns
+  → query contextualization
+  → question type and required-answer planning
+  → applicability filters
+  → FTS5 lexical retrieval + local subword retrieval
+  → reciprocal-rank fusion and coverage reranking
+  → optional allowlisted official/public web retrieval
+  → answerability decision
+  → evidence packet for the LLM
+  → claim/citation/authority validation
+  → answer with sources OR refusal and human handoff
+  → trace for evaluation
 ```
 
-Expose that protected local process only through a temporary HTTPS tunnel and
-stop both processes after testing. Quick tunnels are a development convenience,
-not a production deployment or an authorization service. Never commit the
-access code or enter sensitive personal information in a preview environment.
-When a reverse proxy changes the origin-facing `Host`, configure only its exact
-HTTPS public origin. Wildcard tunnel origins are intentionally unsupported.
+### Why hybrid retrieval
 
-DOCX and XLSX body extraction, plus the development toolchain, are enabled
-when optional packages are installed:
+- **FTS5 lexical retrieval** preserves exact policy terms, form names, dates,
+  course types, and document numbers.
+- **Local hashed subword retrieval** adds a reproducible offline similarity
+  channel for Chinese phrasing variations.
+- **Reciprocal-rank fusion** combines both candidate lists without hiding the
+  retrieval logic behind a single opaque score.
+- **Applicability metadata** keeps cohort, academic year, student level, major,
+  and campus attached to every chunk.
+- **Authority metadata** controls how evidence may be stated. A directly
+  relevant student measurement can answer a lifestyle question, but must be
+  labeled as peer experience rather than school policy.
+
+SQLite is the inspectable MVP system of record. The logical `documents` and
+`chunks` model can later move to PostgreSQL/pgvector without changing the
+evidence contract.
+
+## Knowledge and SOP integration
+
+The ingestion pipeline is source-aware rather than a universal fixed-token
+splitter:
+
+| Source type | Retrieval unit | Control |
+| --- | --- | --- |
+| FAQ | Complete question and answer | Preserves scope and caveats |
+| Policy/handbook | Heading-aware paragraphs | Retains conditions, exceptions, page, and effective date |
+| Service manual/SOP | Ordered steps | Preserves executable procedure sequence |
+| Safe student measurement | One structured item | Makes each fact independently citable |
+| Form/link | Action or resource | Never treated as policy evidence |
+| Image/scanned PDF | Non-assertable until parsed | Prevents filenames from masquerading as facts |
+| Personal-record spreadsheet | Quarantined | Prevents private records from entering retrieval |
+
+Official-site synchronization and per-query web retrieval are intentionally
+separate. New or changed official pages remain `pending` until reviewed; a
+checksum change invalidates the previous approval.
+
+## Agent controls and failure handling
+
+The planner routes a request through one of four evidence paths:
+
+1. `local_knowledge`
+2. `official_web_discovery`
+3. `public_web_discovery`
+4. `official_and_public_web_discovery`
+
+Before generation, the system assigns an explicit answerability state such as
+`supported`, `experience_only`, `supported_with_context`,
+`supported_with_unresolved_wording`, or `insufficient_official_evidence`.
+Unsupported factual generation is blocked.
+
+After generation, the validator checks that:
+
+- every citation exists in the supplied evidence packet;
+- policy claims use assertable official evidence;
+- peer evidence remains labeled as experience;
+- uncertainty and applicability are not silently removed;
+- a refusal is preserved when `can_generate=false`.
+
+Full natural-language entailment checking is not yet implemented; this README
+does not claim otherwise.
+
+## Evaluation framework
+
+The project treats evaluation as a product loop, not a one-time model score.
+No production-quality metric is reported until a sufficiently large,
+human-labeled test set exists.
+
+| Layer | Metric or check | Product question |
+| --- | --- | --- |
+| Retrieval | Recall@K, MRR, source-type and applicability match | Did the agent find the right evidence? |
+| Grounding | Citation validity, claim-evidence linkage, unsupported-claim rate | Is the answer supported by what was retrieved? |
+| Resolution | Self-service resolution rate, handoff rate, repeat-contact rate | Did the student's issue reach a useful endpoint? |
+| Service quality | Completeness, correctness, clarity, policy/experience labeling | Was the resolution trustworthy and usable? |
+| User outcome | Explicit helpfulness/CSAT and task completion | Did the student feel helped and complete the next step? |
+| Operations | Latency, provider/fallback rate, failure taxonomy, cost per resolved case | Can the service run reliably and economically? |
+| Safety | PII leakage, stale-policy use, invalid authority escalation | Did the agent stay within its operating boundary? |
+
+The repository currently includes labeled retrieval questions and chat-contract
+checks for citation, refusal, authority, and response shape. The next evaluation
+step is to sample real failed queries, label root causes, and build held-out
+scenario sets around the highest-volume intents.
+
+### Query trace for case analysis
+
+Each chat request produces a privacy-aware trace containing:
+
+- redacted user query and contextualized retrieval query;
+- local and web candidates, including rejected evidence;
+- selected evidence and answerability decision;
+- provider, model, and fallback path;
+- grounding result, final answer, citations, errors, and stage latency;
+- environment and request source for separating evaluation from real traffic.
+
+It deliberately excludes hidden model reasoning, credentials, cookies, and
+authorization headers. Common emails, phone numbers, and long identifiers are
+redacted; session identifiers are one-way hashed. Production traces and opt-in
+handoffs default to 30-day retention.
+
+```bash
+campus-copilot traces list --environment production --source browser --limit 50
+campus-copilot traces show trace_<id>
+campus-copilot handoffs list --limit 50
+```
+
+## Product decisions and trade-offs
+
+| Decision | Why now | Planned evolution |
+| --- | --- | --- |
+| Evidence-first orchestration | Fluent output must not conceal weak retrieval | Add claim-level entailment and temporal-conflict evaluation |
+| SQLite + inspectable hybrid search | Small, batch-updated corpus; exact terms matter; easy to audit | Migrate to PostgreSQL/pgvector when measured scale requires it |
+| Human handoff as a first-class outcome | “I don't know” alone does not resolve a support case | Add ownership, status, SLA, and resolution feedback to the queue |
+| Provider-neutral LLM adapter | Avoid model lock-in and preserve fallback | Compare providers on quality, latency, availability, and cost |
+| Reviewed-source web access | Freshness matters, but open-web authority is risky | Add a reviewed mainland-China search/official-account adapter |
+| Bounded in-memory conversation | Minimizes privacy and account complexity in the MVP | Persist history only with identity, isolation, consent, and retention controls |
+
+## Repository and branch strategy
+
+| Branch | Role | Status |
+| --- | --- | --- |
+| `main` | Reviewed RAG, answerability, evaluation, tracing, handoff, and single-server deployment baseline | Stable integration source |
+| `xiaohaigpt` | Student-facing live experience with additional admin/knowledge workflows and senior Q&A | Experimental; capabilities return to `main` only through scoped, tested PRs |
+
+The original HIC onboarding knowledge base and public source site are created
+and maintained by **Zihuanana**. **Pengwei Fu** designed and implemented the
+retrieval, grounded-generation, evaluation, cloud-model integration, trace,
+handoff, and deployment layers in this repository. Collaboration follows
+issues, independent branches, reviewed pull requests, and explicit ownership
+boundaries; the live branch is not presented as if every feature already exists
+on `main`.
+
+## Interview demo walkthrough
+
+Use three questions to show different agent behaviors:
+
+1. **Peer experience:** `宿舍是几人间，能确定吗？`<br>
+   Inspect how student experience is retrieved, labeled, and qualified.
+2. **Official procedure:** `新生第一次选课怎么操作？`<br>
+   Inspect ordered SOP evidence, applicability, and citations.
+3. **Coverage gap:** ask a current rule that the corpus cannot directly prove.<br>
+   Inspect the refusal boundary, human-handoff offer, and execution trace.
+
+For each case, discuss the same PM loop: user intent → evidence/tool choice →
+answerability → response or handoff → trace → evaluation label → next product
+iteration.
+
+## Run locally
 
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -e '.[parsers,dev]'
+
+make sync          # synchronize the public demo corpus
+make build         # normalize, chunk, and index
+make audit         # inspect provenance, privacy, parsing, and freshness gaps
+make evaluate      # run labeled retrieval checks
+make evaluate-chat # run grounding and refusal contract checks
+make serve         # open http://127.0.0.1:8000
 ```
 
-Without the optional packages, the full FAQ, links, and PDFs remain supported;
-DOCX/XLSX files are kept in the catalog with `metadata_only` parse status. The
-system will not pretend an unparsed document supports an answer.
+The provider interface accepts OpenAI-compatible chat-completions endpoints,
+including DeepSeek or an AI gateway. Credentials live only in ignored local or
+server environment files; the no-key local composer keeps the full path
+runnable.
 
-`make` automatically uses `.venv/bin/python` when that environment exists, so
-a complete index is not accidentally rebuilt with a parser-free system Python.
+Useful APIs:
 
-## API
+```text
+GET  /api/health
+GET  /api/corpus/stats
+GET  /api/library
+POST /api/search
+POST /api/context
+POST /api/chat
+POST /api/session/reset
+```
 
-The lightweight standard-library HTTP server exposes:
-
-- `GET /api/health`
-- `GET /api/corpus/stats`
-- `GET /api/library`
-- `GET /files/<manifest-listed filename>`
-- `POST /api/search`
-- `POST /api/context`
-- `POST /api/chat`
-- `POST /api/session/reset`
-
-`/api/library` is a read-only projection of the synchronized original source
-manifest and student Q&A. It omits administrative fields. `/files/` serves only
-visible, manifest-listed local attachments and rejects path traversal; run
-`make sync` first when the raw source files are not present locally.
-
-Example:
+Example retrieval request:
 
 ```bash
 curl -s http://127.0.0.1:8000/api/search \
@@ -159,215 +311,25 @@ curl -s http://127.0.0.1:8000/api/search \
   -d '{"query":"宿舍是几人间","profile":{"cohort":"2026"}}'
 ```
 
-`/api/chat` adds a bounded in-memory conversation (the most recent four turns),
-uses prior user intent to resolve explicit follow-ups, retrieves fresh evidence
-for every turn, and returns both an audit answer and a citation-free
-`display_answer`, plus only the cited `sources` for student-facing rendering.
-It also returns a `trace_id` for correlating the answer with its local execution
-trace.
+See [`docs/KNOWLEDGE_MODEL.md`](docs/KNOWLEDGE_MODEL.md) for the indexing
+decisions, [`docs/LLM_INTEGRATION.md`](docs/LLM_INTEGRATION.md) for the model
+contract, and [`deploy/README.md`](deploy/README.md) for the reviewed Tencent
+Cloud single-server deployment.
 
-## RAG execution traces
+## Current boundary and roadmap
 
-The development runtime records a privacy-aware trace for each chat request in
-the ignored local database `data/runtime/rag_traces.db`. A trace shows the
-redacted query, contextualized retrieval query, local and web candidates,
-selected and rejected evidence, answerability decision, model/provider and
-fallback path, grounding validation, final response, citations, errors, and
-per-stage latency. It intentionally does not store hidden model reasoning,
-credentials, cookies, or authorization headers. Common email addresses, phone
-numbers, and long identifiers are redacted, and session IDs are one-way hashed.
+The current corpus is a useful seed, not a complete official source of truth.
+The immediate roadmap is driven by observed support failures:
 
-Inspect recent requests or one complete flow with:
+1. establish a human-labeled intent and resolution benchmark from real queries;
+2. add claim-level entailment and temporal-conflict evaluation;
+3. close high-volume knowledge gaps and add official-account ingestion;
+4. turn handoff into a tracked resolution workflow with owner, SLA, and outcome;
+5. experiment with retrieval, prompts, and conversation strategy using offline
+   gates before controlled online A/B tests;
+6. add structured actions/tool calling only after factual-answer reliability is
+   established.
 
-```bash
-campus-copilot traces list --limit 20
-campus-copilot traces show trace_<id>
-```
-
-Each new trace includes `environment` and `source`. Browser traffic is labeled
-`browser`, command-line chat is `cli`, and contract evaluation is `evaluation`.
-Filter the operator list when reviewing real traffic:
-
-```bash
-campus-copilot traces list --environment production --source browser --limit 50
-```
-
-Set `CAMPUS_ENVIRONMENT=production` in the deployed server environment. Local
-development defaults to `development`; rows created before this metadata was
-introduced are preserved and labeled `legacy`.
-
-Tracing is enabled by default for development and retained for 30 days. Change
-the local behavior without editing code:
-
-```dotenv
-CAMPUS_TRACE_ENABLED=0
-CAMPUS_TRACE_RETENTION_DAYS=30
-CAMPUS_TRACE_DB_PATH=/absolute/local/path/rag_traces.db
-CAMPUS_ENVIRONMENT=development
-```
-
-For a public deployment, keep this database outside the web root, restrict
-operator access, and set a retention period appropriate to the privacy policy.
-
-When the final answer cannot provide both cited evidence and a supported useful
-conclusion—including partial web results that do not resolve the core
-question—the UI uses the standard human-handoff fallback and offers an explicit,
-optional follow-up form. A submitted
-email is stored in a separate `human_handoffs` table together with the redacted
-query and its `trace_id`; it is not sent to the model and is not added to the
-knowledge base. Operators can review the private queue on the server:
-
-```bash
-PYTHONPATH=src .venv/bin/python -m campus_copilot.cli handoffs list --limit 20
-PYTHONPATH=src .venv/bin/python -m campus_copilot.cli handoffs show handoff_<id>
-```
-
-The endpoint requires same-origin browser submission, validates the email and
-trace, and limits each client to five submissions per hour. Human-follow-up
-records use the same retention period as traces. Because the address must remain
-usable for a reply, it is sensitive plaintext operational data: never place the
-runtime database under `web/`, commit it, or expose it through a public admin
-endpoint.
-
-When local evidence is insufficient, the answer plan can execute governed live
-retrieval. `config/web_sources.json` registers reviewed school and public
-sources together with query hints, authority, dates, and applicability. The
-runtime fetches the current HTML or PDF, enforces an exact HTTPS host allowlist
-to prevent SSRF, extracts a focused passage, retries transient failures, and
-caches results for 30 minutes. Retrieved school pages are labeled
-`official_web`; contextual sources such as a government climate standard remain
-separate as `public_web` and cannot substantiate school-policy claims.
-
-Retrieved candidates are not automatically answer evidence. For question types
-with explicit objects, the answer layer checks required aspects before adopting
-a passage. A certificate-wording question must be covered by
-`毕业证/学位证/证书`; a passage that only shares `中外合作办学` is discarded even
-when its lexical score is high. Credential questions always run official and
-public web enrichment, then rank local and web candidates by question coverage,
-direct-answer presence, authority, and retrieval score. An official page that
-only states which certificate is awarded cannot prove what is printed on it.
-
-Legacy HTTP-only pages are never added to the live-fetch allowlist. A manually
-verified excerpt may be stored as a dated `verified_web_snapshot`, labeled as a
-public reference with its uncertainty, while live fetching remains HTTPS-only.
-
-The registry remains the low-latency reviewed source layer. Optional autonomous
-discovery is provided through a separate `SearchDiscoveryProvider`; the first
-development adapter uses Tavily. When configured, official and public answer routes search
-beyond the registry, convert results into the same evidence contract, deduplicate
-URLs, and apply the existing authority, coverage, uncertainty, and citation
-controls. Official searches accept only `cuc.edu.cn` and its subdomains;
-non-official results remain `public_web`. Common email, phone, and long numeric
-identifiers are removed before sending a query to the provider.
-
-Makers Models supplies the answer model; it is not itself a web-search service.
-Without a search key, the application reports `registry_only` and keeps the
-reviewed-source behavior rather than pretending to have searched the open web.
-Official WeChat discovery still needs a separate provider or ingestion adapter.
-
-The Tavily adapter is for development evaluation, not the default for a service
-deployed in mainland China. A mainland production deployment should use a
-domestic provider and endpoint after privacy, source-URL, content-safety, and
-network-reliability review. Provider credentials remain separate from Makers.
-
-To evaluate Tavily locally, add these values to ignored `.env.local`:
-
-```dotenv
-CAMPUS_WEB_SEARCH_PROVIDER=tavily
-CAMPUS_WEB_SEARCH_API_KEY=your-key
-```
-
-Then run `make search-check`. The returned `answer_plan` should show
-`web_discovery_executed: true`, `web_discovery_provider: tavily`, and the source
-cards should label newly found pages as autonomous official/public search.
-
-## Governed official-site corpus
-
-The durable official corpus is maintained separately from per-question web
-search. `config/official_crawl.json` defines HTTPS hosts, path prefixes, seeds,
-page limits, issuers, and tags. The synchronizer respects `robots.txt`, refuses
-redirects outside the allowlist, ignores media links, bounds response size, and
-stores content-addressed immutable snapshots under ignored
-`data/official_sites/`.
-
-```bash
-make official-sync
-make official-review
-PYTHONPATH=src .venv/bin/python -m campus_copilot.cli official-review \
-  --approve 'https://hainan.cuc.edu.cn/example/page.htm'
-make build
-```
-
-New and changed pages are always `pending`. An unchanged page retains its
-review status; a changed checksum creates a new immutable version and removes
-the old approval from the active page. Only the latest `approved` snapshot is
-converted into an `official_web` document during `make build`. This keeps
-automatic discovery separate from authority to publish an answer.
-
-`/api/context` returns the same model-ready evidence packet and response policy.
-A provider receives only this packet and must:
-
-1. cite the supplied evidence IDs;
-2. label peer experience as peer experience;
-3. never upgrade `unknown`, `likely`, or `inferred` into a fact;
-4. abstain when the packet says `can_generate=false`;
-5. preserve year, cohort, major, and campus applicability.
-
-## Optional economical model
-
-Any chat-completions endpoint that follows the OpenAI-compatible request shape
-can be used without adding a Python SDK. Configuration is entirely external:
-
-```bash
-export CAMPUS_LLM_BASE_URL="https://your-provider.example/v1"
-export CAMPUS_LLM_MODEL="your-economical-chat-model"
-export CAMPUS_LLM_API_KEY="..."
-make serve
-```
-
-The adapter requests structured claims and citations. Its output is checked
-against the current evidence IDs and source authority. Invalid output or a
-provider outage automatically falls back to the local composer. The current
-session store is intentionally process-local; persistence, account isolation,
-and cross-device history belong to a later production phase.
-
-### Tencent EdgeOne Makers Models
-
-The repository includes a provider preset for Makers Models. Create a dedicated
-API key in `Makers > Models > API Key`, then keep it in the ignored local file:
-
-```bash
-cp .env.example .env.local
-# Edit .env.local and set CAMPUS_LLM_API_KEY without committing the file.
-make makers-check
-make serve
-```
-
-The preset selects `https://ai-gateway.edgeone.link/v1` and
-`@makers/deepseek-v4-flash`. Either can still be overridden through
-`CAMPUS_LLM_BASE_URL` and `CAMPUS_LLM_MODEL`, preserving provider portability.
-`GET /api/health` reports the provider, model, and whether a credential is
-configured, but never returns the credential itself.
-
-The same health response reports whether governed web retrieval is enabled.
-The web registry and fetcher contain no model credentials.
-
-## Current corpus boundary
-
-The public site is a useful seed corpus, not a complete official source of
-truth. The MVP excludes QR communities and flags record-style spreadsheets as
-potentially sensitive. It also distinguishes `uploadTime` from publication and
-effective dates.
-
-`evaluate-chat` checks grounding plus a basic direct-answer shape; it is not a
-claim that answer quality is solved. Human-labeled completeness, usefulness,
-temporal conflicts, tone, and held-out questions remain required before
-reporting a production accuracy metric.
-
-## Contributing and release status
-
-The repository is being prepared for shared maintenance. See
-[`CONTRIBUTING.md`](CONTRIBUTING.md) for the branch/PR workflow and
-[`docs/COLLABORATION.md`](docs/COLLABORATION.md) for ownership boundaries.
-Until the collaborators confirm code and content licenses, treat the repository
-as private and do not redistribute the synchronized source corpus.
+Code and synchronized content licensing are still being documented. Treat the
+repository as private and do not redistribute the source corpus until those
+boundaries are confirmed.
