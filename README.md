@@ -1,229 +1,201 @@
 # Campus Onboarding Copilot
 
-An evidence-grounded AI customer service agent for incoming university students.
-It turns fragmented FAQs, policy documents, service manuals, and student
-experience into cited answers, while escalating unresolved cases for human
-follow-up.
+Campus Onboarding Copilot is an evidence-grounded AI customer service agent for
+incoming university students. It retrieves information from policies, service
+manuals, FAQs, student guides, and reviewed web sources; produces cited
+answers; and routes unresolved cases to a human follow-up queue.
 
-> **Live experience:** [XiaohaiGPT student demo](https://hic.zihuanana.top/xiaohaigpt.html)<br>
+> **Live application:** [XiaohaiGPT](https://hic.zihuanana.top/xiaohaigpt.html)<br>
 > **Source library:** [HIC onboarding portal](https://hic.zihuanana.top/)<br>
-> The live experience runs the experimental `xiaohaigpt` branch. The reviewed
-> RAG, evaluation, tracing, and deployment baseline lives on `main`.
+> The live application runs the experimental `xiaohaigpt` branch. `main`
+> contains the reviewed RAG, evaluation, tracing, handoff, and deployment
+> baseline documented below.
 
-This is an independent student-built project, not an official university
-service. Users should verify time-sensitive policies against the latest school
-notice.
+This is an independent student project. Time-sensitive policies should be
+verified against the latest university notice.
 
-## Product in action
+## Product overview
 
-### Grounded answer and unresolved-case handoff
+Incoming students often know the question they need answered without knowing
+which document, department, or terminology contains the answer. Relevant
+information is spread across formal policies, service manuals, attachments,
+student-maintained FAQs, spreadsheets, and frequently updated webpages.
 
-![XiaohaiGPT answering a dormitory question with cited evidence and a human follow-up state](docs/assets/student-chat-grounded-answer.jpg)
+The Copilot organizes this support journey into seven steps:
 
-The student-facing experience answers from retrieved evidence, exposes the
-supporting-source drawer, and keeps a human-response state in the same
-conversation when the case needs follow-up.
+1. interpret the question with recent conversation context;
+2. identify the required answer type and student applicability;
+3. retrieve evidence from the local corpus and approved web sources;
+4. assess whether the available evidence can support an answer;
+5. compose and validate the response;
+6. offer human follow-up when coverage is insufficient;
+7. record a privacy-aware trace for evaluation and iteration.
+
+### Core capabilities
+
+| Capability | Implementation |
+| --- | --- |
+| Multi-turn support | Bounded conversation context with fresh retrieval on every turn |
+| Hybrid retrieval | SQLite FTS5, local hashed subword vectors, reciprocal-rank fusion, and coverage reranking |
+| Knowledge governance | Provenance, authority, dates, applicability, checksums, parse status, and review state |
+| Grounded generation | Versioned evidence packet, structured claims, citations, and post-generation validation |
+| Retrieval tools | Local knowledge, governed official web retrieval, and optional public web discovery |
+| Human handoff | Opt-in follow-up queue linked to the redacted query and execution trace |
+| Observability | Candidate evidence, selection decisions, fallback path, validation result, errors, and latency |
+| Deployment | Docker Compose, Caddy HTTPS, health checks, persistent runtime volume, and rate limiting |
+
+## Product interface
+
+### Grounded answer and human follow-up
+
+![XiaohaiGPT answering a dormitory question with cited evidence and a human follow-up action](docs/assets/student-grounded-answer.png)
+
+The response states the source boundary, provides a supporting-evidence drawer,
+and keeps the escalation action next to the answer. This makes verification and
+follow-up part of the same support flow.
 
 ### Searchable source library
 
-![HIC onboarding source library with filters, official documents, service manuals, and student resources](docs/assets/source-library.jpg)
+![HIC source library with document filters, official policies, manuals, links, and student resources](docs/assets/source-library-files.png)
 
-The assistant does not replace source access. Students can still search and
-browse the underlying policies, manuals, forms, links, and peer-maintained
-resources directly.
+![Student-maintained onboarding Q&A grouped by topic](docs/assets/source-library-qa.png)
 
-## The customer-service problem
-
-Incoming students repeatedly ask questions such as:
-
-- “How many people share a dorm room?”
-- “How do I complete new-student information collection?”
-- “What are the course add/drop rules?”
-- “What should I do if the available documents do not answer my case?”
-
-The information exists, but is distributed across formal policies, service
-manuals, student-maintained FAQs, spreadsheets, attachments, and changing web
-pages. A fluent chatbot alone is unsafe: official rules and peer experience
-have different authority, documents may be stale, and some questions require a
-human rather than a generated answer.
-
-The product goal is therefore **end-to-end issue resolution**, not answer
-generation alone:
-
-1. understand the student's intent and context;
-2. retrieve the most applicable evidence;
-3. decide whether the evidence is sufficient to answer;
-4. compose and validate a grounded response;
-5. expose sources and uncertainty;
-6. route unresolved cases to a human queue;
-7. turn failed queries into evaluation and knowledge-base improvements.
-
-## Product experience
-
-| Stage | Student experience | Agent behavior |
-| --- | --- | --- |
-| Ask | Natural-language, multi-turn chat | Classifies the question and resolves explicit follow-ups |
-| Find | No need to know document names | Searches local knowledge and, when governed, reviewed web sources |
-| Answer | Direct response followed by supporting sources | Separates official policy, official guidance, public context, and peer experience |
-| Verify | Visible citations and unresolved boundaries | Validates citations, authority, applicability, and refusal rules |
-| Escalate | Optional email follow-up when self-service fails | Stores a redacted query, trace ID, and opt-in contact in a private queue |
-| Improve | Better coverage over time | Operators inspect failure traces and convert repeated gaps into corpus or product work |
+Students retain direct access to the underlying files and curated Q&A. The
+library also gives operators a visible view of the corpus that powers the
+assistant.
 
 ## System architecture
 
-```mermaid
-flowchart LR
-    U[Student] --> UI[Responsive chat + source library]
-    UI --> O[Agent orchestrator]
+![Campus Onboarding Copilot architecture from student request through retrieval, validation, handoff, and evaluation](docs/assets/system-architecture.png)
 
-    O --> P[Intent and answer-shape planner]
-    P --> LR[Local retrieval tool]
-    P --> WR[Governed web retrieval tool]
+The agent core plans the evidence route, invokes retrieval tools, and passes a
+bounded context packet to the answer composer. The validation layer checks
+citations and source policy before the response reaches the user. Unanswerable
+requests enter the follow-up queue. Execution traces support offline analysis,
+evaluation, and guardrail development across the complete path.
 
-    KB[(SQLite knowledge base)] --> LR
-    REG[Reviewed source registry] --> WR
-    LR --> F[Applicability filter + rank fusion]
-    WR --> F
-
-    F --> A{Answerable?}
-    A -->|Yes| C[LLM answer composer]
-    C --> V[Grounding and citation validator]
-    V --> UI
-    A -->|No| H[Human handoff tool]
-    V -->|Validation fails| H
-    H --> Q[(Private follow-up queue)]
-    H --> UI
-
-    O --> T[(Privacy-aware execution traces)]
-    P --> T
-    F --> T
-    C --> T
-    V --> T
-    H --> T
-    T --> E[Evaluation and iteration loop]
-    E --> P
-    E --> KB
-```
-
-The LLM is an answer composer—not the knowledge base, retrieval judge, or final
-authority. The application can fall back to an auditable local composer when a
-model is unavailable or its response fails validation.
-
-## How one query is resolved
+## Request lifecycle
 
 ```text
 question + student profile + recent turns
   → query contextualization
-  → question type and required-answer planning
+  → question type and answer-shape planning
   → applicability filters
   → FTS5 lexical retrieval + local subword retrieval
   → reciprocal-rank fusion and coverage reranking
   → optional allowlisted official/public web retrieval
   → answerability decision
   → evidence packet for the LLM
-  → claim/citation/authority validation
-  → answer with sources OR refusal and human handoff
-  → trace for evaluation
+  → claim, citation, and authority validation
+  → grounded response or human handoff
+  → execution trace and evaluation
 ```
 
-### Why hybrid retrieval
+The model receives the planned query, response policy, answerability state, and
+ranked evidence objects. Retrieval and source-policy decisions remain in the
+application layer. When the provider is unavailable or its output fails
+validation, an extractive local composer keeps the request path operational.
 
-- **FTS5 lexical retrieval** preserves exact policy terms, form names, dates,
-  course types, and document numbers.
-- **Local hashed subword retrieval** adds a reproducible offline similarity
-  channel for Chinese phrasing variations.
-- **Reciprocal-rank fusion** combines both candidate lists without hiding the
-  retrieval logic behind a single opaque score.
-- **Applicability metadata** keeps cohort, academic year, student level, major,
-  and campus attached to every chunk.
-- **Authority metadata** controls how evidence may be stated. A directly
-  relevant student measurement can answer a lifestyle question, but must be
-  labeled as peer experience rather than school policy.
+## Knowledge and retrieval
 
-SQLite is the inspectable MVP system of record. The logical `documents` and
-`chunks` model can later move to PostgreSQL/pgvector without changing the
-evidence contract.
+### Document model
 
-## Knowledge and SOP integration
+SQLite is the inspectable system of record for the current corpus:
 
-The ingestion pipeline is source-aware rather than a universal fixed-token
-splitter:
+- `documents` stores provenance, authority, dates, applicability, checksums,
+  and parse status;
+- `chunks` stores meaning-preserving retrieval units and citation locations;
+- `chunk_fts` provides lexical retrieval over Chinese n-grams, titles,
+  headings, and tags;
+- local hashed subword vectors provide a second offline candidate list;
+- reciprocal-rank fusion combines lexical and subword rankings before coverage
+  and applicability reranking.
 
-| Source type | Retrieval unit | Control |
+This design keeps source lineage visible during development and review. The
+logical document and chunk model can later move to PostgreSQL and pgvector as
+traffic, concurrent writes, or embedding requirements grow.
+
+### Source-aware chunking
+
+| Source | Retrieval unit | Policy |
 | --- | --- | --- |
 | FAQ | Complete question and answer | Preserves scope and caveats |
-| Policy/handbook | Heading-aware paragraphs | Retains conditions, exceptions, page, and effective date |
-| Service manual/SOP | Ordered steps | Preserves executable procedure sequence |
+| Policy or handbook | Heading-aware paragraphs | Retains conditions, exceptions, page, and effective date |
+| Service manual or SOP | Ordered steps | Preserves procedure sequence |
 | Safe student measurement | One structured item | Makes each fact independently citable |
-| Form/link | Action or resource | Never treated as policy evidence |
-| Image/scanned PDF | Non-assertable until parsed | Prevents filenames from masquerading as facts |
-| Personal-record spreadsheet | Quarantined | Prevents private records from entering retrieval |
+| Form or link | Resource/action record | Offered as a next step, excluded from policy claims |
+| Image or scanned PDF | Metadata until successful parsing | Excluded from factual answers while content is unavailable |
+| Personal-record spreadsheet | Quarantined | Excluded from indexing and public retrieval |
 
-Official-site synchronization and per-query web retrieval are intentionally
-separate. New or changed official pages remain `pending` until reviewed; a
-checksum change invalidates the previous approval.
+### Source authority and answerability
 
-## Agent controls and failure handling
+Every evidence object carries an authority type and assertion policy. Official
+policy can support formal rules; official guidance can support a procedure;
+peer material is presented as student experience; public web material supplies
+general context.
 
-The planner routes a request through one of four evidence paths:
-
-1. `local_knowledge`
-2. `official_web_discovery`
-3. `public_web_discovery`
-4. `official_and_public_web_discovery`
-
-Before generation, the system assigns an explicit answerability state such as
+Before generation, the planner assigns an answerability state such as
 `supported`, `experience_only`, `supported_with_context`,
 `supported_with_unresolved_wording`, or `insufficient_official_evidence`.
-Unsupported factual generation is blocked.
+Generation proceeds only when the evidence satisfies the required answer
+aspects.
 
-After generation, the validator checks that:
+Official-site synchronization and per-request web retrieval use separate
+workflows. New or changed official pages enter a review queue, and a checksum
+change resets the previous approval before the content can return to the local
+index.
 
-- every citation exists in the supplied evidence packet;
-- policy claims use assertable official evidence;
-- peer evidence remains labeled as experience;
-- uncertainty and applicability are not silently removed;
-- a refusal is preserved when `can_generate=false`.
+## Response validation and handoff
 
-Full natural-language entailment checking is not yet implemented; this README
-does not claim otherwise.
+The post-generation validator currently enforces these contracts:
 
-## Evaluation framework
+- every citation resolves to evidence supplied for the current request;
+- factual claims remain linked to cited evidence IDs;
+- policy claims use an assertable official source;
+- peer evidence retains its student-experience label;
+- uncertainty and student applicability remain visible;
+- an insufficient-evidence decision returns a refusal and follow-up route.
 
-The project treats evaluation as a product loop, not a one-time model score.
-No production-quality metric is reported until a sufficiently large,
-human-labeled test set exists.
+Claim-level natural-language entailment and temporal-conflict detection remain
+planned work.
 
-| Layer | Metric or check | Product question |
+When the evidence cannot support a useful conclusion, the client offers an
+optional email follow-up. The private queue stores the redacted query, trace ID,
+and submitted address. Contact information stays outside the model context and
+knowledge index.
+
+## Evaluation and observability
+
+Evaluation covers retrieval quality, response quality, customer-service
+outcomes, reliability, and safety. Production metrics will be reported after a
+sufficiently large human-labeled set is available.
+
+| Layer | Metric or check | Purpose |
 | --- | --- | --- |
-| Retrieval | Recall@K, MRR, source-type and applicability match | Did the agent find the right evidence? |
-| Grounding | Citation validity, claim-evidence linkage, unsupported-claim rate | Is the answer supported by what was retrieved? |
-| Resolution | Self-service resolution rate, handoff rate, repeat-contact rate | Did the student's issue reach a useful endpoint? |
-| Service quality | Completeness, correctness, clarity, policy/experience labeling | Was the resolution trustworthy and usable? |
-| User outcome | Explicit helpfulness/CSAT and task completion | Did the student feel helped and complete the next step? |
-| Operations | Latency, provider/fallback rate, failure taxonomy, cost per resolved case | Can the service run reliably and economically? |
-| Safety | PII leakage, stale-policy use, invalid authority escalation | Did the agent stay within its operating boundary? |
+| Retrieval | Recall@K, MRR, source-type match, applicability match | Measure evidence discovery |
+| Grounding | Citation validity, claim-evidence linkage, unsupported-claim rate | Measure factual support |
+| Resolution | Self-service resolution, handoff, and repeat-contact rates | Measure issue completion |
+| Service quality | Correctness, completeness, clarity, and source labeling | Measure answer usefulness |
+| User outcome | Helpfulness/CSAT and task completion | Measure student experience |
+| Operations | Stage latency, provider/fallback rate, error class, cost per resolution | Measure service health |
+| Safety | PII leakage, stale-policy use, authority escalation | Measure guardrail performance |
 
-The repository currently includes labeled retrieval questions and chat-contract
-checks for citation, refusal, authority, and response shape. The next evaluation
-step is to sample real failed queries, label root causes, and build held-out
-scenario sets around the highest-volume intents.
+The repository includes labeled retrieval cases and chat-contract checks for
+citations, refusals, authority, and response shape. Each chat request also
+produces a trace with:
 
-### Query trace for case analysis
-
-Each chat request produces a privacy-aware trace containing:
-
-- redacted user query and contextualized retrieval query;
+- redacted and contextualized queries;
 - local and web candidates, including rejected evidence;
 - selected evidence and answerability decision;
 - provider, model, and fallback path;
-- grounding result, final answer, citations, errors, and stage latency;
-- environment and request source for separating evaluation from real traffic.
+- validation result, final answer, citations, errors, and stage latency;
+- environment and request source for separating evaluation traffic from real
+  browser sessions.
 
-It deliberately excludes hidden model reasoning, credentials, cookies, and
-authorization headers. Common emails, phone numbers, and long identifiers are
+Traces exclude model credentials, cookies, authorization headers, and hidden
+model reasoning. Common emails, phone numbers, and long identifiers are
 redacted; session identifiers are one-way hashed. Production traces and opt-in
-handoffs default to 30-day retention.
+handoffs use a 30-day default retention period.
 
 ```bash
 campus-copilot traces list --environment production --source browser --limit 50
@@ -231,77 +203,87 @@ campus-copilot traces show trace_<id>
 campus-copilot handoffs list --limit 50
 ```
 
-## Product decisions and trade-offs
+## Getting started
 
-| Decision | Why now | Planned evolution |
-| --- | --- | --- |
-| Evidence-first orchestration | Fluent output must not conceal weak retrieval | Add claim-level entailment and temporal-conflict evaluation |
-| SQLite + inspectable hybrid search | Small, batch-updated corpus; exact terms matter; easy to audit | Migrate to PostgreSQL/pgvector when measured scale requires it |
-| Human handoff as a first-class outcome | “I don't know” alone does not resolve a support case | Add ownership, status, SLA, and resolution feedback to the queue |
-| Provider-neutral LLM adapter | Avoid model lock-in and preserve fallback | Compare providers on quality, latency, availability, and cost |
-| Reviewed-source web access | Freshness matters, but open-web authority is risky | Add a reviewed mainland-China search/official-account adapter |
-| Bounded in-memory conversation | Minimizes privacy and account complexity in the MVP | Persist history only with identity, isolation, consent, and retention controls |
+### Requirements
 
-## Repository and branch strategy
+- Python 3.9 or later
+- `make`
+- network access for corpus synchronization
+- optional model and search credentials for provider-backed generation and web
+  discovery
 
-| Branch | Role | Status |
-| --- | --- | --- |
-| `main` | Reviewed RAG, answerability, evaluation, tracing, handoff, and single-server deployment baseline | Stable integration source |
-| `xiaohaigpt` | Student-facing live experience with additional admin/knowledge workflows and senior Q&A | Experimental; capabilities return to `main` only through scoped, tested PRs |
-
-The original HIC onboarding knowledge base and public source site are created
-and maintained by **Zihuanana**. **Pengwei Fu** designed and implemented the
-retrieval, grounded-generation, evaluation, cloud-model integration, trace,
-handoff, and deployment layers in this repository. Collaboration follows
-issues, independent branches, reviewed pull requests, and explicit ownership
-boundaries; the live branch is not presented as if every feature already exists
-on `main`.
-
-## Interview demo walkthrough
-
-Use three questions to show different agent behaviors:
-
-1. **Peer experience:** `宿舍是几人间，能确定吗？`<br>
-   Inspect how student experience is retrieved, labeled, and qualified.
-2. **Official procedure:** `新生第一次选课怎么操作？`<br>
-   Inspect ordered SOP evidence, applicability, and citations.
-3. **Coverage gap:** ask a current rule that the corpus cannot directly prove.<br>
-   Inspect the refusal boundary, human-handoff offer, and execution trace.
-
-For each case, discuss the same PM loop: user intent → evidence/tool choice →
-answerability → response or handoff → trace → evaluation label → next product
-iteration.
-
-## Run locally
+### Install and run
 
 ```bash
+git clone git@github.com:cuchic-community-lab/campus-onboarding-copilot.git
+cd campus-onboarding-copilot
+
 python3 -m venv .venv
 .venv/bin/pip install -e '.[parsers,dev]'
 
-make sync          # synchronize the public demo corpus
-make build         # normalize, chunk, and index
-make audit         # inspect provenance, privacy, parsing, and freshness gaps
-make evaluate      # run labeled retrieval checks
-make evaluate-chat # run grounding and refusal contract checks
-make serve         # open http://127.0.0.1:8000
+make sync
+make build
+make audit
+make serve
 ```
 
-The provider interface accepts OpenAI-compatible chat-completions endpoints,
-including DeepSeek or an AI gateway. Credentials live only in ignored local or
-server environment files; the no-key local composer keeps the full path
-runnable.
+Open [http://127.0.0.1:8000](http://127.0.0.1:8000).
 
-Useful APIs:
+`make sync` downloads the public demo manifest and files. `make build`
+normalizes, chunks, and indexes the corpus. Optional DOCX/XLSX parsers are
+included by the installation command above.
 
-```text
-GET  /api/health
-GET  /api/corpus/stats
-GET  /api/library
-POST /api/search
-POST /api/context
-POST /api/chat
-POST /api/session/reset
+### Configuration
+
+Copy the example file and keep the populated file untracked:
+
+```bash
+cp .env.example .env.local
 ```
+
+| Variable | Required | Description |
+| --- | --- | --- |
+| `CAMPUS_LLM_PROVIDER` | For model generation | Provider preset or provider label |
+| `CAMPUS_LLM_API_KEY` | For model generation | Server-side model credential |
+| `CAMPUS_LLM_BASE_URL` | For custom provider | OpenAI-compatible `/v1` endpoint |
+| `CAMPUS_LLM_MODEL` | For custom provider | Model identifier |
+| `CAMPUS_LLM_TIMEOUT` | No | Provider timeout in seconds; default `30` |
+| `CAMPUS_WEB_SEARCH_PROVIDER` | For autonomous discovery | Search-provider adapter; development supports `tavily` |
+| `CAMPUS_WEB_SEARCH_API_KEY` | For autonomous discovery | Separate search credential |
+| `CAMPUS_WEB_SEARCH_TIMEOUT` | No | Search timeout in seconds; default `12` |
+| `CAMPUS_TRACE_ENABLED` | No | Enables local execution tracing; default `1` |
+| `CAMPUS_TRACE_RETENTION_DAYS` | No | Trace and handoff retention; default `30` |
+| `CAMPUS_ENVIRONMENT` | No | Trace environment label; default `development` |
+
+The included Makers preset supplies its gateway URL and model name. Any
+OpenAI-compatible endpoint can be configured through the base URL, model, and
+API key variables. With no model credential, the application uses its local
+composer.
+
+### Useful commands
+
+```bash
+make query Q="宿舍是几人间，能确定吗？"
+make chat Q="新生第一次选课怎么操作？"
+make evaluate
+make evaluate-chat
+make publication-audit
+make test
+```
+
+## API
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/health` | Runtime, database, model, and search readiness |
+| `GET` | `/api/corpus/stats` | Indexed corpus summary |
+| `GET` | `/api/library` | Public projection of synchronized resources |
+| `GET` | `/files/<filename>` | Allowlisted manifest attachment |
+| `POST` | `/api/search` | Retrieval candidates and scoring metadata |
+| `POST` | `/api/context` | Model-ready evidence packet and answer plan |
+| `POST` | `/api/chat` | Grounded response, sources, and trace ID |
+| `POST` | `/api/session/reset` | Clear the current bounded conversation |
 
 Example retrieval request:
 
@@ -311,25 +293,82 @@ curl -s http://127.0.0.1:8000/api/search \
   -d '{"query":"宿舍是几人间","profile":{"cohort":"2026"}}'
 ```
 
-See [`docs/KNOWLEDGE_MODEL.md`](docs/KNOWLEDGE_MODEL.md) for the indexing
-decisions, [`docs/LLM_INTEGRATION.md`](docs/LLM_INTEGRATION.md) for the model
-contract, and [`deploy/README.md`](deploy/README.md) for the reviewed Tencent
-Cloud single-server deployment.
+## Testing and quality gates
 
-## Current boundary and roadmap
+```bash
+make test
+make evaluate
+make evaluate-chat
+make audit
+make publication-audit
+```
 
-The current corpus is a useful seed, not a complete official source of truth.
-The immediate roadmap is driven by observed support failures:
+- unit tests cover retrieval, planning, composition, source policy, web
+  retrieval, tracing, handoff, preview security, frontend contracts, and
+  deployment configuration;
+- retrieval evaluation uses labeled questions in
+  `evaluation/golden_questions.jsonl`;
+- chat evaluation checks citation, refusal, authority, and answer-shape
+  contracts;
+- publication audit rejects tracked secrets and private/generated corpus files.
 
-1. establish a human-labeled intent and resolution benchmark from real queries;
-2. add claim-level entailment and temporal-conflict evaluation;
-3. close high-volume knowledge gaps and add official-account ingestion;
-4. turn handoff into a tracked resolution workflow with owner, SLA, and outcome;
-5. experiment with retrieval, prompts, and conversation strategy using offline
-   gates before controlled online A/B tests;
-6. add structured actions/tool calling only after factual-answer reliability is
-   established.
+## Production deployment
 
-Code and synchronized content licensing are still being documented. Treat the
-repository as private and do not redistribute the source corpus until those
-boundaries are confirmed.
+The reviewed beta deployment uses one Tencent Cloud Lighthouse or CVM instance,
+Docker Compose, and Caddy. The application container runs without root
+privileges; Caddy terminates HTTPS; a named volume persists traces and handoff
+records across releases.
+
+Production credentials belong in the ignored `deploy/.env.production` file.
+Port `8000` remains private, while Caddy exposes ports `80` and `443`.
+
+See [`deploy/README.md`](deploy/README.md) for provisioning, startup, backup,
+upgrade, and release-gate instructions.
+
+## Repository layout
+
+```text
+src/campus_copilot/       agent planning, retrieval, composition, tracing, API
+config/                   governed web and official-crawl registries
+evaluation/               labeled retrieval scenarios
+web/                      student-facing responsive client
+tests/                    unit and contract tests
+docs/                     knowledge model, LLM contract, collaboration notes
+deploy/                   Docker/Caddy production configuration and runbook
+data/                     reviewed seed corpus and ignored runtime artifacts
+```
+
+## Project status and collaboration
+
+| Branch | Role | Status |
+| --- | --- | --- |
+| `main` | RAG, answerability, evaluation, tracing, handoff, and single-server deployment baseline | Reviewed integration branch |
+| `xiaohaigpt` | Live student experience, admin/knowledge workflows, and senior Q&A | Experimental integration branch |
+
+Capabilities move from `xiaohaigpt` to `main` through scoped pull requests with
+tests and review. See [`CONTRIBUTING.md`](CONTRIBUTING.md) and
+[`docs/COLLABORATION.md`](docs/COLLABORATION.md) for the shared workflow.
+
+The original HIC onboarding knowledge base and public source site are created
+and maintained by **Zihuanana**. **Pengwei Fu** designed and implemented the
+retrieval, grounded generation, evaluation, cloud-model integration, tracing,
+handoff, and production deployment layers in this repository.
+
+## Roadmap
+
+- build a larger human-labeled benchmark from real query failures;
+- add claim-level entailment and temporal-conflict evaluation;
+- expand reviewed official-site and official-account coverage;
+- add owner, status, SLA, and resolution outcome to the handoff workflow;
+- compare retrieval, prompt, and conversation-strategy changes through offline
+  gates and controlled experiments;
+- introduce structured action tools after the factual support path meets its
+  quality threshold.
+
+## Data and licensing boundary
+
+The current corpus covers a limited set of onboarding scenarios. QR-based
+communities and privacy-sensitive record spreadsheets remain outside the index.
+Code and synchronized content licensing are still under review, so repository
+access and corpus redistribution remain restricted until those terms are
+documented.
