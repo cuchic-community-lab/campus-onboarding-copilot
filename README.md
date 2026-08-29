@@ -201,25 +201,6 @@ campus-copilot traces show trace_<id>
 campus-copilot handoffs list --limit 50
 ```
 
-## Collaboration and ownership
-
-This project is maintained through independent branches and reviewed pull
-requests.
-
-| Branch | Role | Status |
-| --- | --- | --- |
-| `main` | RAG, answerability, evaluation, tracing, handoff, and single-server deployment baseline | Reviewed integration branch |
-| `xiaohaigpt` | Live student experience, admin/knowledge workflows, and senior Q&A | Experimental integration branch |
-
-The original HIC onboarding knowledge base and public source site are created
-and maintained by **Zihuanana**. **Pengwei Fu** designed and implemented the
-retrieval, grounded generation, evaluation, cloud-model integration, tracing,
-handoff, and production deployment layers in this repository.
-
-Capabilities move from `xiaohaigpt` to `main` through scoped pull requests with
-tests and review. See [`CONTRIBUTING.md`](CONTRIBUTING.md) and
-[`docs/COLLABORATION.md`](docs/COLLABORATION.md) for the shared workflow.
-
 ## Roadmap
 
 - build a larger human-labeled benchmark from real query failures;
